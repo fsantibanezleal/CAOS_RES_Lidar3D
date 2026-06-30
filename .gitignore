@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Heavy / generated (live on E: or are reproducible) — NEVER commit
+out/
+*.ply
+*.las
+*.npy
+*.mp4
+/web/vendor/        # if three.js is ever vendored
+
+# Secrets / local
+.env
+
+# OS
+Thumbs.db
+.DS_Store
