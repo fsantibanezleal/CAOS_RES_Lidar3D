@@ -1,73 +1,44 @@
-// The replay SPA: list cases grouped by CATEGORY, select one, replay its committed trace (CONTRACT 2). The
-// always-available static path (ADR-0054); the optional Pyodide live lane (src/pyodide) is the recompute upgrade.
-import { useEffect, useMemo, useState } from 'react';
-import { loadIndex, loadManifest, loadTrace } from './api/artifacts';
-import type { CaseIndex, CaseManifest, Trace } from './lib/contract.types';
-import { SIRChart } from './render/SIRChart';
+// The 6-page shell (ADR-0016): header (brand + nav + icons + lang + theme + arch modal) · the page ·
+// footer. Page state + theme/lang in localStorage. The App page is the workbench; the rest are deep texts.
+import { useEffect, useState } from 'react';
+import './style.css';
+import { ArchModal } from './components/ArchModal';
+import { Footer } from './components/Footer';
+import { Header, type Page } from './components/Header';
+import { type Lang } from './i18n';
+import { AppPage } from './pages/AppPage';
+import { Benchmark } from './pages/Benchmark';
+import { Experiments } from './pages/Experiments';
+import { Implementation } from './pages/Implementation';
+import { Introduction } from './pages/Introduction';
+import { Methodology } from './pages/Methodology';
 
 export default function App() {
-  const [index, setIndex] = useState<CaseIndex | null>(null);
-  const [sel, setSel] = useState('');
-  const [manifest, setManifest] = useState<CaseManifest | null>(null);
-  const [trace, setTrace] = useState<Trace | null>(null);
-  const [err, setErr] = useState('');
+  const [page, setPage] = useState<Page>('app');
+  const [lang, setLang] = useState<Lang>((localStorage.getItem('l3d_lang') as Lang) || 'en');
+  const [dark, setDark] = useState(localStorage.getItem('l3d_theme') !== 'light');
+  const [arch, setArch] = useState(false);
 
   useEffect(() => {
-    loadIndex()
-      .then((ix) => {
-        setIndex(ix);
-        setSel(ix.cases[0]?.case_id ?? '');
-      })
-      .catch((e: unknown) => setErr(String(e)));
-  }, []);
-
-  useEffect(() => {
-    if (!sel) return;
-    loadManifest(sel)
-      .then((m) => {
-        setManifest(m);
-        return loadTrace(m.artifact.path);
-      })
-      .then(setTrace)
-      .catch((e: unknown) => setErr(String(e)));
-  }, [sel]);
-
-  const byCategory = useMemo(() => {
-    const out: Record<string, string[]> = {};
-    index?.cases.forEach((c) => (out[c.category] ??= []).push(c.case_id));
-    return out;
-  }, [index]);
+    document.body.classList.toggle('light', !dark);
+    localStorage.setItem('l3d_theme', dark ? 'dark' : 'light');
+  }, [dark]);
+  useEffect(() => { localStorage.setItem('l3d_lang', lang); }, [lang]);
 
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 900, margin: '2rem auto', padding: '0 1rem' }}>
-      <h1>Product — deterministic replay</h1>
-      <p>Replaying committed artifacts (CONTRACT 2). {index?.n_cases ?? 0} cases across {Object.keys(byCategory).length} categories.</p>
-      {err && <p style={{ color: '#f85149' }}>error: {err}</p>}
-      <label>
-        Case:{' '}
-        <select value={sel} onChange={(e) => setSel(e.target.value)}>
-          {Object.entries(byCategory).map(([cat, ids]) => (
-            <optgroup key={cat} label={cat}>
-              {ids.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      {manifest && (
-        <p>
-          lane: <b>{manifest.lane}</b> — <i>{manifest.expected_band}</i>
-        </p>
-      )}
-      {trace && <SIRChart trace={trace} />}
-      {trace && (
-        <p>
-          peak I: {trace.summary.peak_I} at t={trace.summary.t_peak} · attack rate {trace.summary.attack_rate}
-        </p>
-      )}
-    </main>
+    <>
+      <Header page={page} setPage={setPage} lang={lang} setLang={setLang}
+        dark={dark} setDark={setDark} openArch={() => setArch(true)} />
+      <main className="app">
+        {page === 'app' && <AppPage lang={lang} dark={dark} />}
+        {page === 'intro' && <Introduction lang={lang} />}
+        {page === 'method' && <Methodology lang={lang} />}
+        {page === 'impl' && <Implementation lang={lang} />}
+        {page === 'exp' && <Experiments lang={lang} />}
+        {page === 'bench' && <Benchmark lang={lang} />}
+      </main>
+      <Footer lang={lang} />
+      {arch && <ArchModal lang={lang} onClose={() => setArch(false)} />}
+    </>
   );
 }
