@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install (offline lane + dev + editable pkg)
+        run: pip install -r data-pipeline/requirements.txt -r requirements-dev.txt -e .
+      - name: Lint
+        run: ruff check data-pipeline tests
+      - name: Tests
+        run: pytest
+      - name: Pipeline smoke (regenerate the synthetic CPU case)
+        run: python -m lidar3dlab.pipeline SYN_orbit
+      - name: CONTRACT 2 — manifests <-> artifacts consistent (no drift)
+        run: python scripts/check_artifacts.py
+
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Base-integrity guards (the regressions this archetype forbids)
+        run: |
+          fail=0
+          # a real .env must never be tracked (only .env.example)
+          if git ls-files | grep -qE '(^|/)\.env(\..+)?$' && ! git ls-files | grep -qx '.env.example'; then
+            echo "::error::a real .env is tracked (only .env.example may be)"; fail=1; fi
+          # venvs / native binaries / heavy model blobs must never be tracked
+          if git ls-files | grep -qiE '(^|/)\.?venv|\.(dll|so|dylib|pt|pth)$'; then
+            echo "::error::a venv or native/heavy binary is tracked (recreate from requirements; keep models small/LFS)"; fail=1; fi
+          # raw/heavy data must never be tracked — commit only compact derived artifacts under data/derived/
+          if git ls-files | grep -qiE '\.(parquet|h5|hdf5|nc|mat|npy)$'; then
+            echo "::error::raw/heavy data tracked — commit only compact derived artifacts (data/derived/)"; fail=1; fi
+          # no leaked local machine paths in tracked sources
+          if git grep -nF 'D:\_Repos' -- . ':!.github' >/dev/null 2>&1; then
+            echo "::error::leaked local machine path (D:\\_Repos) in a tracked file"; fail=1; fi
+          if [ "$fail" -eq 0 ]; then echo "guards: OK"; fi
+          exit $fail

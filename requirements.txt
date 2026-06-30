@@ -1,14 +1,2 @@
-# App + serving (the .venv runtime). Heavy engine deps (torch + lingbot-map) are in
-# requirements-precompute.txt because they need the CUDA wheel index — see scripts/setup.*.
-fastapi>=0.110
-uvicorn[standard]>=0.29
-websockets>=12
-numpy>=1.26
-pillow>=10
-matplotlib>=3.8
-opencv-python>=4.9
-einops>=0.7
-scipy>=1.11
-huggingface_hub>=0.23
-safetensors>=0.4
-tqdm>=4.66
+# CORE / LIVE lane — minimal, Pyodide-safe. Pinned to the verified install (Python 3.12, 2026-06-20).
+numpy==2.4.6

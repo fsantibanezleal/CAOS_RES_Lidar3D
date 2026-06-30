@@ -1,18 +1,39 @@
 # Changelog
 
-All notable changes to CAOS_RES_Lidar3D. Format: `X.XX.XXX` (per conventions/versioning.md).
+All notable changes to this product. Format: `X.XX.XXX` (display) — see `lidar3dlab.__version__`. Keep `0.x`
+while on mock/synthetic data. Tag every release.
 
-## [0.01.000] - 2026-06-29
+## [0.02.000] · 2026-06-30
+
+### Changed (rebuild from the template, replacing the non-compliant first build)
+- Replaced the EXAMPLE SIR engine with the real product: the **lingbot-map** streaming reconstruction engine
+  (arXiv:2604.14141, vendored Apache-2.0) wired into the frozen staged pipeline, plus a synthetic CPU engine
+  for CI. Stage names + both data contracts kept.
+- `io/schema` (`SequenceSpec`, `ReconResult`) + `io/contract` (RGB-sequence ingestion gate); `config`
+  resolves the model/data roots from the **environment** (no personal paths versioned; the API never returns
+  an absolute path).
+- New `refine` stage (the texture/color layer); `train` is a documented dormant no-op (pretrained engine).
+- CONTRACT 2 trace = a compact base64 RGB-colored point cloud + camera trajectory + depth thumbnails.
+
 ### Added
-- Initial research lab: deep SOTA research (feed-forward 3D reconstruction, LiDAR SLAM, 3DGS + web viz),
-  17-paper reference library, and the lingbot-map deep dive.
-- Vendored `lingbot-map` (arXiv:2604.14141, Apache-2.0) and validated it runs on the local RTX 4070
-  (8 GB) on the real `oxford` sequence (28 frames, 249k-point cloud, 3.21 m path, 7.1 GB VRAM).
-- Real streaming backend: `LingbotEngine` drives the model frame-by-frame; FastAPI server streams each
-  frame's geometry over a WebSocket. 8 GB-safe config (SDPA, CPU-offload, window=16, bf16).
-- Interactive three.js workbench: live point cloud + camera-frustum trajectory + live depth + stats,
-  source selector, orbit + controls, light/dark, EN/ES, architecture modal (ADR-0058).
-- Screenshot-verified end-to-end (zero JS errors).
+- Frontend (ADR-0016 + ADR-0058): a 6-page React/Vite shell with a **three.js RGB point-cloud viewer**
+  (color/texture, not a bare LiDAR map), camera-frustum trajectory, per-frame depth, EN/ES, light/dark, the
+  ⓘ architecture modal, and KaTeX content. Screenshot-verified.
+- Cases: `SYN_orbit` (CPU/CI) + `oxford/university/loop/courthouse` (real, GPU-baked); `docs/frameworks/lingbot-map`.
+- Tests + CI adapted (the synthetic case is the smoke); the CONTRACT-2 + base-integrity guards stay.
 
-### Notes
-- Research repo (ADR-0050): local-first, deploy `none`; heavy models/data on E: (never in git).
+### Verified
+- `SYN_orbit` bakes on CPU (deterministic); `oxford` = 193k-pt RGB cloud, 3.13 m, lane=precompute, ~7.1 GB peak.
+- ruff clean, pytest green, frontend builds (tsc + vite), 5 cases manifest-to-artifact consistent.
+
+## [0.01.000] — 2026-06-20
+
+### Added
+- Initial instantiation from the CAOS product-repo template (ADR-0057).
+- Offline `data-pipeline/` (`lidar3dlab`): the two data contracts (ingestion + artifact), the named staged
+  pipeline (preprocess → feature_extraction → train → infer → evaluate → export), the seeded RNG, the compact
+  trace, the manifest, and the measured live-vs-precompute gate.
+- EXAMPLE engine: a deterministic SIR epidemic (numpy-only, Pyodide-safe) — **replace with the product's
+  research-chosen SOTA engine**.
+- Cases-by-category registry (4 regimes + 1 degenerate control); a live-lane entrypoint (`live.py`); tests for
+  both contracts + pipeline determinism.

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="The science / algorithm flow — placeholder, specialise per product">
+  <!-- PLACEHOLDER (template). Each product REPLACES this with its real algorithm,
+       step by step, with the genuine equations. Keep the shell tokens (themed). -->
+  <style>
+    .arch-svg text { font-family: var(--font-sans, Inter, "Segoe UI", system-ui, sans-serif); }
+    .arch-svg .mono { font-family: var(--font-mono, ui-monospace, Consolas, monospace); }
+    .arch-svg .bx { fill: var(--color-surface-2); stroke: var(--color-border); stroke-width: 1.2; }
+    .arch-svg .bx-hi { stroke: var(--color-accent); }
+    .arch-svg .bx-good { stroke: var(--color-good); }
+    .arch-svg .ttl { fill: var(--color-fg); font-size: 13px; font-weight: 700; }
+    .arch-svg .sub { fill: var(--color-fg-subtle); font-size: 10px; }
+    .arch-svg .it { fill: var(--color-fg); font-size: 10.5px; }
+    .arch-svg .cd { fill: var(--color-accent); font-size: 9.5px; }
+    .arch-svg .eq { fill: var(--color-fg); font-size: 12px; font-style: italic; }
+    .arch-svg .mu { fill: var(--color-fg-subtle); font-size: 10px; }
+    .arch-svg .flow { fill: none; stroke: var(--color-fg-faint); stroke-width: 1.6; }
+    .arch-svg .ph { fill: var(--color-warn); font-size: 10px; font-weight: 600; }
+  </style>
+  <defs>
+    <marker id="sc-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--color-fg-faint)"/>
+    </marker>
+  </defs>
+
+  <text class="ttl" x="22" y="30">The science / algorithm flow</text>
+  <text class="ph" x="22" y="47">PLACEHOLDER — replace with this product's real stages + equations (e.g. image → watershed → PSD → Rosin–Rammler)</text>
+
+  <!-- staged pipeline -->
+  <rect class="bx bx-hi" x="20" y="78" width="180" height="92" rx="10"/>
+  <text class="it" x="34" y="104">① Ingest + normalise</text>
+  <text class="mu" x="34" y="124">validated input (Contract 1)</text>
+  <text class="cd mono" x="34" y="150">stages/01_*.py</text>
+
+  <rect class="bx bx-hi" x="232" y="78" width="180" height="92" rx="10"/>
+  <text class="it" x="246" y="104">② Core transform</text>
+  <text class="mu" x="246" y="124">the real method / model</text>
+  <text class="cd mono" x="246" y="150">stages/02_*.py</text>
+
+  <rect class="bx bx-hi" x="444" y="78" width="180" height="92" rx="10"/>
+  <text class="it" x="458" y="104">③ Estimate + fit</text>
+  <text class="mu" x="458" y="124">parameters, uncertainty</text>
+  <text class="cd mono" x="458" y="150">stages/03_*.py</text>
+
+  <rect class="bx bx-good" x="656" y="78" width="180" height="92" rx="10"/>
+  <text class="it" x="670" y="104">④ Metrics + artifact</text>
+  <text class="mu" x="670" y="124">scored vs baseline / truth</text>
+  <text class="cd mono" x="670" y="150">stages/04_*.py</text>
+
+  <path class="flow" d="M200,124 H230" marker-end="url(#sc-arrow)"/>
+  <path class="flow" d="M412,124 H442" marker-end="url(#sc-arrow)"/>
+  <path class="flow" d="M624,124 H654" marker-end="url(#sc-arrow)"/>
+
+  <!-- equation band -->
+  <rect class="bx" x="20" y="200" width="816" height="86" rx="10"/>
+  <text class="it" x="36" y="224">The governing relation (replace with the product's real equation):</text>
+  <text class="eq" x="36" y="256">y = f( x ; θ )            P(x) = 1 − exp[ −(x / x_c)^n ]            (placeholder)</text>
+  <text class="mu" x="36" y="276">render the real maths with KaTeX on the Methodology page; this SVG mirrors it visually.</text>
+
+  <!-- baseline vs learned -->
+  <rect class="bx" x="20" y="312" width="404" height="128" rx="10"/>
+  <text class="it" x="36" y="336" style="font-weight:700">Classical baseline</text>
+  <text class="mu" x="36" y="358">a transparent, deterministic method —</text>
+  <text class="mu" x="36" y="378">the honest reference every result is</text>
+  <text class="mu" x="36" y="398">measured against.</text>
+  <text class="cd mono" x="36" y="424">src/&lt;domain&gt;/*.ts (runs live)</text>
+
+  <rect class="bx bx-good" x="444" y="312" width="392" height="128" rx="10"/>
+  <text class="it" x="460" y="336" style="font-weight:700">Learned model</text>
+  <text class="mu" x="460" y="358">trained offline (torch), exported to</text>
+  <text class="mu" x="460" y="378">ONNX, run client-side; reported with</text>
+  <text class="mu" x="460" y="398">held-out skill vs the baseline.</text>
+  <text class="cd mono" x="460" y="424">model/learned.py → *.onnx → ort.ts</text>
+</svg>

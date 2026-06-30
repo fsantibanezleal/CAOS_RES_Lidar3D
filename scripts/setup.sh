@@ -1,12 +1,28 @@
 #!/usr/bin/env bash
-# One-shot environment setup (Python 3.12 .venv + torch cu126 + vendored lingbot-map).
-set -e
+# Create BOTH venvs + install per-lane requirements + the editable package. Idempotent. No global installs.
+#   .venv-pipeline = heavy OFFLINE lane (data-pipeline/requirements.txt) + dev + editable pkg  (local-only)
+#   .venv          = runtime/live-thin lane (requirements.txt)                                  (what ships)
+# Dormant lanes are skipped gracefully. Re-runnable.
+set -euo pipefail
 cd "$(dirname "$0")/.."
-py -3.12 -m venv .venv 2>/dev/null || python -m venv .venv
-PY=.venv/Scripts/python.exe; [ -f "$PY" ] || PY=.venv/bin/python
-"$PY" -m pip install -U pip
-"$PY" -m pip install -r requirements.txt
-# Heavy engine: torch matching the local driver (560.x -> CUDA 12.6), then vendored lingbot-map.
-"$PY" -m pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
-"$PY" -m pip install -e third_party/lingbot-map --no-deps
-echo "Setup done. Run:  $PY run_app.py   (then http://127.0.0.1:8120)"
+PY="${PYTHON:-python}"
+
+mkvenv() { [ -d "$1" ] || "$PY" -m venv "$1"; }
+venvpy() { local p="$1/bin/python"; [ -x "$p" ] || p="$1/Scripts/python.exe"; echo "$p"; }
+
+echo "[setup] .venv-pipeline (offline lane)…"
+mkvenv .venv-pipeline
+VP="$(venvpy .venv-pipeline)"
+"$VP" -m pip install --upgrade pip -q
+"$VP" -m pip install -q -r data-pipeline/requirements.txt -r requirements-dev.txt
+"$VP" -m pip install -q -e .
+echo "[setup] .venv-pipeline ready."
+
+echo "[setup] .venv (runtime/live-thin lane)…"
+mkvenv .venv
+VR="$(venvpy .venv)"
+"$VR" -m pip install --upgrade pip -q
+"$VR" -m pip install -q -r requirements.txt
+echo "[setup] .venv ready."
+
+echo "[setup] done. Next:  ./scripts/precompute.sh   then   ./scripts/dev.sh"
