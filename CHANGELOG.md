@@ -3,6 +3,18 @@
 All notable changes to this product. Format: `X.XX.XXX` (display) — see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.03.000] · 2026-06-30
+
+### Added (the LiDAR modality — makes "Lidar 3D" honest, a second real engine)
+- `model/lidar.py`: a **LiDAR odometry engine** (Open3D point-to-plane ICP) that registers LiDAR scans
+  frame-to-frame and accumulates a height-colored map + trajectory. KISS-ICP (SOTA LiDAR-only odometry) is
+  pinned and swappable behind the same interface. Synthetic scans (CI-safe) + a real-scan path
+  (`.bin/.npy/.ply`, resolved via `LIDAR3D_DATA_ROOT`).
+- `SequenceSpec.modality` (`camera` | `lidar`); `infer` dispatches on it; new cases `LID_synthetic` (CPU/CI)
+  + `kitti_lidar` (real-data hook). Verified: `LID_synthetic` = 72k-pt ICP-registered map, 30 scans, ~5 m.
+- `refine` now runs Open3D (voxel + outlier + normals) when available (cleaner cloud; mesh-ready).
+- Pinned `open3d` + `kiss-icp` in the precompute requirements; engine label is modality-aware. Screenshot-verified.
+
 ## [0.02.000] · 2026-06-30
 
 ### Changed (rebuild from the template, replacing the non-compliant first build)
