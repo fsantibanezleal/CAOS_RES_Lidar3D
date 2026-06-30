@@ -1,8 +1,9 @@
-"""The offline pipeline orchestrator + CLI (ADR-0057). Runs the named stages per case, applies CONTRACT 1, writes
-the compact artifact + manifest (CONTRACT 2) and a flat index.json.
+"""The offline pipeline orchestrator + CLI (ADR-0057). Runs the named stages per case, applies CONTRACT 1,
+writes the compact artifact + manifest (CONTRACT 2) and a flat index.json.
 
-    python -m lidar3dlab.pipeline            # all cases
-    python -m lidar3dlab.pipeline EX02_epidemic --seed 7
+    python -m lidar3dlab.pipeline                 # all cases (real ones need the GPU + LIDAR3D_DATA_ROOT/MODELS_ROOT)
+    python -m lidar3dlab.pipeline SYN_orbit       # the synthetic CPU case (CI-safe)
+    python -m lidar3dlab.pipeline oxford --seed 7
 """
 from __future__ import annotations
 
@@ -10,59 +11,58 @@ import argparse
 import time
 from pathlib import Path
 
-from . import registry
+from . import __version__, registry
 from .core.manifest import build_index
-from .core.rng import make_rng
 from .io.contract import validate_rows
 from .io.formats import write_json
-from .io.schema import SIRParams
-from .stages import evaluate, export, infer, train
+from .stages import evaluate, export, feature_extraction, infer, preprocess, refine, train
 
-# data-pipeline/lidar3dlab/pipeline.py -> parents[2] = repo root (works under `pip install -e .` too)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DERIVED = REPO_ROOT / "data" / "derived"
 MANIFESTS = DERIVED / "manifests"
-MODELS = REPO_ROOT / "models"
 
-STAGES = ("preprocess", "feature_extraction", "train", "infer", "evaluate", "export")
-
-
-def _train_model() -> dict:
-    # didactic surrogate: train on the non-degenerate case params; held-out eval uses a disjoint synthetic draw
-    params = [c.params for c in registry.list_cases() if c.params.I0 > 0]
-    return train.run(params, str(MODELS))
+STAGES = ("preprocess", "feature_extraction", "train", "infer", "refine", "evaluate", "export")
 
 
-def _holdout_params(seed: int) -> list[SIRParams]:
-    rng = make_rng(seed + 999)  # disjoint from training => leakage-safe
-    out: list[SIRParams] = []
-    for i in range(20):
-        out.append(SIRParams(f"_holdout{i}", beta=float(rng.uniform(0.15, 1.2)),
-                             gamma=float(rng.uniform(0.15, 0.40)), N=100_000.0, I0=50.0))
-    return out
+def _row(spec) -> dict:
+    return {"case_id": spec.case_id, "source_dir": spec.source_dir, "max_frames": spec.max_frames,
+            "image_size": spec.image_size, "decimation": spec.decimation, "conf_quantile": spec.conf_quantile,
+            "synthetic": spec.synthetic, "kv_window": spec.kv_window, "scale_frames": spec.scale_frames,
+            "camera_iters": spec.camera_iters}
 
 
-def precompute(case_id: str, seed: int = 42, model: dict | None = None) -> dict:
+def precompute(case_id: str, seed: int = 42) -> dict:
     case = registry.get_case(case_id)
-    if model is None:
-        model = _train_model()
+    rep = validate_rows([_row(case.params)])      # CONTRACT 1 (bring-your-own-data gate)
+    if not rep.accepted:
+        return {"case_id": case_id, "skipped": True, "reason": rep.rejected}
+    spec = rep.accepted[0]
+
     t0 = time.perf_counter()
-    # run CONTRACT 1 on the case params (proves the gate + carries flags); a real product reads raw data here
-    rep = validate_rows([{"case_id": case.params.case_id, "beta": case.params.beta, "gamma": case.params.gamma,
-                          "N": case.params.N, "I0": case.params.I0, "days": case.params.days}])
-    params = rep.accepted[0] if rep.accepted else case.params
-    result = infer.run(params)
-    metrics = evaluate.run(model, _holdout_params(seed))
+    prepared = preprocess.run(spec)
+    feats = feature_extraction.run(spec, prepared)
+    train.run()                                   # dormant: the engine is the pretrained foundation model
+    result = infer.run(spec, seed)
+    result, refine_info = refine.run(result)
+    metrics = evaluate.run(result)
+    metrics["n_quality_frames"] = len(feats)
     run_ms = (time.perf_counter() - t0) * 1000.0
-    return export.run(case=case, params=params, result=result, seed=seed, run_ms=run_ms,
-                      flags=rep.flagged, metrics=metrics, derived_dir=str(DERIVED), manifests_dir=str(MANIFESTS))
+
+    engine = {"package": "lidar3dlab", "version": __version__,
+              "model": ("synthetic-corridor (CPU)" if spec.synthetic else "lingbot-map (arXiv:2604.14141)"),
+              "pretrained": (not spec.synthetic)}
+    return export.run(case=case, params=spec, result=result, refine_info=refine_info, seed=seed,
+                      run_ms=run_ms, flags=rep.flagged, metrics=metrics, engine=engine,
+                      derived_dir=str(DERIVED), manifests_dir=str(MANIFESTS))
 
 
 def run_all(seed: int = 42) -> list[dict]:
-    model = _train_model()
-    entries = []
+    entries: list[dict] = []
     for c in registry.list_cases():
-        precompute(c.id, seed=seed, model=model)
+        m = precompute(c.id, seed=seed)
+        if m.get("skipped"):
+            print(f"  SKIP {c.id}: data not available ({m['reason']})")
+            continue
         entries.append({"case_id": c.id, "category": c.category, "manifest_path": f"manifests/{c.id}.json"})
     write_json(MANIFESTS / "index.json", build_index(entries))
     return entries
@@ -77,12 +77,15 @@ def main() -> None:
         entries = run_all(args.seed)
         print(f"precomputed {len(entries)} cases -> {DERIVED}")
         for e in entries:
-            print(f"  {e['case_id']:20s} [{e['category']}]")
+            print(f"  {e['case_id']:16s} [{e['category']}]")
         print(f"index -> {MANIFESTS / 'index.json'}")
     else:
         m = precompute(args.case, args.seed)
-        print(f"precomputed {args.case}: lane={m['lane']} bytes={m['artifact']['bytes']} "
-              f"metrics={m['metrics']} -> {DERIVED / m['artifact']['path']}")
+        if m.get("skipped"):
+            print(f"SKIPPED {args.case}: data not available ({m['reason']})")
+        else:
+            print(f"precomputed {args.case}: lane={m['lane']} bytes={m['artifact']['bytes']} "
+                  f"metrics={m['metrics']} -> {DERIVED / m['artifact']['path']}")
 
 
 if __name__ == "__main__":

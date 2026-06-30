@@ -1,35 +1,10 @@
-"""Stage 3 — train (OFFLINE): fit a tiny surrogate (numpy least-squares) mapping R0 -> peak-infected fraction,
-using the SIR engine as ground truth on the TRAINING params. Saves coeffs to models/surrogate.json. Skippable for
-products with no learned tier. (EXAMPLE — a real product trains its research-chosen model here, exporting ONNX.)"""
+"""Stage 3 — train: intentionally a documented NO-OP for this product. The reconstruction engine is the
+PRETRAINED lingbot-map foundation model (Apache-2.0), used as-is; there is no per-product surrogate to fit.
+The stage name is kept (frozen base) and records that fact in the manifest. A future ONNX distillation of a
+sub-model (e.g. a low-VRAM single-image preview) would live here."""
 from __future__ import annotations
 
-import math
-from pathlib import Path
 
-import numpy as np
-
-from ..io.formats import write_json
-from ..io.schema import SIRParams
-from ..model.sir import simulate
-
-
-def _design(r0: float) -> list[float]:
-    r0 = max(1e-6, r0)
-    return [1.0, r0, math.log(r0), 1.0 / r0]
-
-
-def run(train_params: list[SIRParams], models_dir: str) -> dict:
-    X, y = [], []
-    for p in train_params:
-        r0 = (p.beta / p.gamma) if p.gamma > 0 else 1e-6
-        X.append(_design(r0))
-        y.append((simulate(p).peak_I / p.N) if p.N > 0 else 0.0)
-    coeffs, _res, _rank, _sv = np.linalg.lstsq(np.array(X), np.array(y), rcond=None)
-    model = {"kind": "linear-lstsq", "basis": ["1", "r0", "ln(r0)", "1/r0"], "coeffs": coeffs.tolist()}
-    Path(models_dir).mkdir(parents=True, exist_ok=True)
-    write_json(Path(models_dir) / "surrogate.json", model)
-    return model
-
-
-def predict(model: dict, r0: float) -> float:
-    return float(np.dot(np.array(model["coeffs"]), np.array(_design(r0))))
+def run(*_args, **_kwargs) -> dict:
+    return {"model": "lingbot-map", "pretrained": True, "trained_here": False,
+            "note": "foundation model used as-is; no surrogate training (dormant stage, ADR-0057)"}

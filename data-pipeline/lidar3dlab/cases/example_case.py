@@ -1,36 +1,44 @@
-"""EXAMPLE cases spanning CATEGORIES (the domain problem-type taxonomy). Replace per product with your real,
-varied coverage matrix. Each case: id, category, params, expected band (what a domain expert should see),
-real|synthetic flag. Includes a negative/degenerate CONTROL the engine must handle without crashing."""
+"""Cases spanning CATEGORIES (the reconstruction problem-type taxonomy). The App shows ONE selected case;
+Experiments/Benchmark show cross-case summaries by category. Each case: id, category, SequenceSpec params,
+expected band (what a domain expert should see), real|synthetic flag. Includes a synthetic CONTROL the
+pipeline must handle without a GPU (CI-safe).
+
+The 4 real sequences are the ones shipped with lingbot-map (preserved on the E: scratch volume, resolved via
+LIDAR3D_DATA_ROOT — never an absolute path here). They bake offline on the GPU; the synthetic case bakes on
+CPU and is what CI smoke-tests.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..io.schema import SIRParams
+from ..config import sequence_dir
+from ..io.schema import SequenceSpec
 
 
 @dataclass(frozen=True)
 class Case:
     id: str
     category: str
-    params: SIRParams
+    params: SequenceSpec
     expected_band: str
     real_or_synthetic: str
 
 
+def _real(seq: str, max_frames: int = 48) -> SequenceSpec:
+    return SequenceSpec(case_id=seq, source_dir=str(sequence_dir(seq)), n_frames=0, max_frames=max_frames)
+
+
 CASES: list[Case] = [
-    Case("EX01_subcritical", "sub-critical (R0<1)",
-         SIRParams("EX01_subcritical", beta=0.18, gamma=0.25, N=100_000, I0=50),
-         "no outbreak: peak ~ I0, attack rate ~ 0", "synthetic"),
-    Case("EX02_epidemic", "epidemic (R0>1)",
-         SIRParams("EX02_epidemic", beta=0.55, gamma=0.20, N=100_000, I0=50),
-         "clear single peak; attack rate ~ 0.7-0.9", "synthetic"),
-    Case("EX03_fast_burn", "fast-burn (high R0)",
-         SIRParams("EX03_fast_burn", beta=1.20, gamma=0.20, N=100_000, I0=100),
-         "early sharp peak; attack rate -> ~1", "synthetic"),
-    Case("EX04_slow_spread", "slow-spread (R0~1.2)",
-         SIRParams("EX04_slow_spread", beta=0.30, gamma=0.25, N=100_000, I0=50),
-         "broad low peak late in the horizon", "synthetic"),
-    Case("CTRL_degenerate", "control: degenerate",
-         SIRParams("CTRL_degenerate", beta=0.40, gamma=0.20, N=100_000, I0=0),
-         "I0=0 -> no dynamics (must run, peak_I=0, attack rate=0)", "synthetic"),
+    Case("SYN_orbit", "synthetic: procedural corridor (CPU, CI)",
+         SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=40, max_frames=40,
+                      decimation=4, synthetic=True),
+         "forward tunnel; colored/textured walls; ~5 m path; runs on CPU in <1 s", "synthetic"),
+    Case("oxford", "real: outdoor walk",
+         _real("oxford"), "forward outdoor street; smooth metric trajectory (a few metres)", "real"),
+    Case("university", "real: courtyard",
+         _real("university"), "courtyard walk; metric trajectory; structured facades", "real"),
+    Case("loop", "real: revisit (loop closure)",
+         _real("loop"), "path that revisits; showcases the drift / loop-closure gap", "real"),
+    Case("courthouse", "real: facade orbit",
+         _real("courthouse"), "facade orbit; metric trajectory around a structure", "real"),
 ]
