@@ -57,7 +57,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
               <tr><td>{t(lang, 'points')}</td><td>{trace ? trace.n_points.toLocaleString() : '—'}</td></tr>
               <tr><td>{t(lang, 'path')}</td><td>{trace ? `${trace.path_length} m` : '—'}</td></tr>
               <tr><td>{t(lang, 'lane')}</td><td>{manifest.lane}</td></tr>
-              <tr><td>{t(lang, 'refine')}</td><td>{manifest.refine?.refined ? 'mesh+cloud' : 'colored cloud'}</td></tr>
+              <tr><td>{t(lang, 'refine')}</td><td>{manifest.refine?.refined ? 'cleaned (open3d)' : 'colored cloud'}</td></tr>
             </tbody></table>
             <p className="hint">{t(lang, 'expected')}: {manifest.expected_band}</p>
           </>

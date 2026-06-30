@@ -6,7 +6,9 @@ from ..io.schema import ReconResult, SequenceSpec
 
 
 def run(spec: SequenceSpec, seed: int = 42) -> ReconResult:
-    if spec.synthetic:
+    if spec.modality == "lidar":
+        from ..model.lidar import reconstruct
+    elif spec.synthetic:
         from ..model.synthetic import reconstruct
     else:
         from ..model.lingbot import reconstruct

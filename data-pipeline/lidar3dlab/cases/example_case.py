@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..config import sequence_dir
+from ..config import DATA_ROOT, sequence_dir
 from ..io.schema import SequenceSpec
 
 
@@ -29,10 +29,20 @@ def _real(seq: str, max_frames: int = 48) -> SequenceSpec:
 
 
 CASES: list[Case] = [
-    Case("SYN_orbit", "synthetic: procedural corridor (CPU, CI)",
+    Case("SYN_orbit", "synthetic: camera, procedural corridor (CPU, CI)",
          SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=40, max_frames=40,
                       decimation=4, synthetic=True),
          "forward tunnel; colored/textured walls; ~5 m path; runs on CPU in <1 s", "synthetic"),
+    Case("LID_synthetic", "synthetic: LiDAR ICP odometry (CPU, CI)",
+         SequenceSpec("LID_synthetic", source_dir="synthetic://lidar", n_frames=30, max_frames=30,
+                      synthetic=True, modality="lidar"),
+         "forward LiDAR sweep down a corridor; point-to-plane ICP odometry recovers a ~9 m path; height-colored map",
+         "synthetic"),
+    Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",
+         SequenceSpec("kitti_lidar", source_dir=str(DATA_ROOT / "lidar" / "kitti00"), n_frames=0, max_frames=40,
+                      modality="lidar"),
+         "a folder of .bin/.npy/.ply LiDAR scans; ICP odometry + registered map (bakes offline when the dataset is present)",
+         "real"),
     Case("oxford", "real: outdoor walk",
          _real("oxford"), "forward outdoor street; smooth metric trajectory (a few metres)", "real"),
     Case("university", "real: courtyard",

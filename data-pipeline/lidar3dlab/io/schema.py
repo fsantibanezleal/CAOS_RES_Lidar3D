@@ -24,6 +24,7 @@ class SequenceSpec:
     decimation: int = 6        # keep every Nth pixel for the committed cloud
     conf_quantile: float = 0.30  # drop the lowest-confidence pixels
     synthetic: bool = False    # a procedural CPU case (CI-safe; no GPU/model)
+    modality: str = "camera"   # "camera" (lingbot / synthetic) or "lidar" (ICP odometry on scans)
 
 
 @dataclass(frozen=True)
