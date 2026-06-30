@@ -1,18 +1,16 @@
 # Changelog
 
-All notable changes to CAOS_RES_Lidar3D. Format: `X.XX.XXX` (per conventions/versioning.md).
+All notable changes to this product. Format: `X.XX.XXX` (display) — see `lidar3dlab.__version__`. Keep `0.x`
+while on mock/synthetic data. Tag every release.
 
-## [0.01.000] - 2026-06-29
+## [0.01.000] — 2026-06-20
+
 ### Added
-- Initial research lab: deep SOTA research (feed-forward 3D reconstruction, LiDAR SLAM, 3DGS + web viz),
-  17-paper reference library, and the lingbot-map deep dive.
-- Vendored `lingbot-map` (arXiv:2604.14141, Apache-2.0) and validated it runs on the local RTX 4070
-  (8 GB) on the real `oxford` sequence (28 frames, 249k-point cloud, 3.21 m path, 7.1 GB VRAM).
-- Real streaming backend: `LingbotEngine` drives the model frame-by-frame; FastAPI server streams each
-  frame's geometry over a WebSocket. 8 GB-safe config (SDPA, CPU-offload, window=16, bf16).
-- Interactive three.js workbench: live point cloud + camera-frustum trajectory + live depth + stats,
-  source selector, orbit + controls, light/dark, EN/ES, architecture modal (ADR-0058).
-- Screenshot-verified end-to-end (zero JS errors).
-
-### Notes
-- Research repo (ADR-0050): local-first, deploy `none`; heavy models/data on E: (never in git).
+- Initial instantiation from the CAOS product-repo template (ADR-0057).
+- Offline `data-pipeline/` (`lidar3dlab`): the two data contracts (ingestion + artifact), the named staged
+  pipeline (preprocess → feature_extraction → train → infer → evaluate → export), the seeded RNG, the compact
+  trace, the manifest, and the measured live-vs-precompute gate.
+- EXAMPLE engine: a deterministic SIR epidemic (numpy-only, Pyodide-safe) — **replace with the product's
+  research-chosen SOTA engine**.
+- Cases-by-category registry (4 regimes + 1 degenerate control); a live-lane entrypoint (`live.py`); tests for
+  both contracts + pipeline determinism.

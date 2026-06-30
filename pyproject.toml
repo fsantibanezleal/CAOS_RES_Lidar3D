@@ -1,0 +1,32 @@
+# Product-repo template — the offline engine package (ADR-0057). Rename `lidar3dlab` -> `<slug>lab` per product.
+# The EXAMPLE engine is numpy-only on purpose (an instantly-installable, no-hang reference); a real product pins
+# its research-chosen SOTA engines in data-pipeline/requirements.txt and documents them in docs/frameworks/.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lidar3dlab"
+# PEP 440 form of the display version X.XX.XXX (see CHANGELOG.md + lidar3dlab.__version__).
+version = "0.1.0"
+description = "CAOS product-repo template — offline data-pipeline + two data contracts + staged pipeline (EXAMPLE: SIR)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Felipe Santibáñez-Leal" }]
+dependencies = ["numpy>=1.26"]
+
+[tool.setuptools.packages.find]
+where = ["data-pipeline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+# S/I/R are the standard SIR compartment names; single-letter here is intentional domain notation, not ambiguous.
+ignore = ["E741"]

@@ -1,83 +1,62 @@
-# CAOS_RES_Lidar3D — streaming 3D reconstruction lab
+# CAOS product template — a REAL product repo (not a demo)
 
-> **Lidar 3D** is a research lab + interactive web workbench at the frontier of **feed-forward 3D scene
-> reconstruction**: it turns a video (or, later, a LiDAR) stream into a **camera trajectory + dense
-> metric depth + a live point cloud**, in real time, with **no per-scene optimization**. The hero engine
-> is **lingbot-map** (arXiv:2604.14141), the 2026 state of the art for *streaming* feed-forward
-> reconstruction, run live on the local GPU and streamed to the browser.
+This is the **canonical template** every Faena/CAOS data-product repo is instantiated from. It exists because
+ad-hoc products (bespoke scripts, baked cases, no reproducible env, no data contract) kept shipping — they
+*look* done but **cannot be applied to new data**, so they are demos, not tools. This template makes the standard
+**executable**: clone it, run two scripts, and you have a reproducible offline pipeline that ingests data in a
+**standard format**, processes it through **typed, seeded, tested stages**, emits **committed standard-format
+artifacts + a manifest**, and feeds a web app that **replays** them — and that any third party can point at
+**their own data**.
 
-Research repo (ADR-0050): local-first, deploy class `none`, heavy models/data on `E:` (never in git).
-Status **v0.01.000** — the real streaming core is built and screenshot-verified; the full 6-page
-workbench is in progress (see [Roadmap](#roadmap)).
+It is modelled on the validated exemplar **CAOS_SIMLAB** (`simlab/pipeline.py`, `requirements-*.txt`,
+`scripts/setup+precompute`, `docs/frameworks`, `data/artifacts`, `manifests/`).
 
-![workbench](docs/assets/workbench.png)
+## The two data contracts (the thing that was missing everywhere)
 
-## What works today (verified 2026-06-29)
+A product is only real if data flows through **two enforced contracts**:
 
-- **Real engine, real data, live.** The vendored `lingbot-map` model runs frame-by-frame on the local
-  **RTX 4070 (8 GB)** and streams each frame's geometry over a WebSocket to a three.js viewer. Validated
-  on the real `oxford` sequence: 28 frames → **249k-point cloud**, **3.21 m** camera path, 7.1 GB VRAM,
-  ~1–3 FPS. Not a baked replay — each frame is computed on demand.
-- **Interactive workbench:** source selector (4 real sequences), live point cloud + camera-frustum
-  trajectory + live depth map + live stats, orbit controls, point-size / decimation / confidence /
-  frame-count controls, light·dark, EN·ES, and an in-app architecture modal (ADR-0058).
+1. **Ingestion contract — `raw → processing`.** `productlab/io/contract.py` defines the required schema (columns,
+   units, ranges) of an input dataset and an explicit **outlier policy** (reject / clip / flag). This is the
+   *"bring your own data"* gate: a user's dataset is accepted iff it satisfies the contract. Documented in
+   [docs/data-contract.md](docs/data-contract.md).
+2. **Artifact contract — `processing → web`.** Every pipeline run writes a compact, standard-format artifact and a
+   `manifests/<case>.json` (params, seed, run_ms, bytes, gate verdict, format/version). The web app loads **only**
+   these — it never recomputes — and a TS type mirrors the manifest schema so a contract drift fails the build.
 
-## Why this lab (the SOTA, in brief)
+If either contract is missing, the product is a demo. CI enforces both.
 
-Feed-forward "pointmap" models (DUSt3R → MASt3R → **VGGT** (CVPR'25 best paper) → π³ → MapAnything →
-**lingbot-map**) have replaced classic SfM/MVS/bundle-adjustment with a single transformer forward pass.
-**lingbot-map** is the apex of the *streaming* branch (a Geometric Context Transformer with a paged KV
-cache, ~20 FPS over 10k+ frames, Apache-2.0). The lab uses it for real and pursues its **stated gaps**
-as a novel agenda: **loop closure**, **LiDAR fusion**, **test-time refinement**. Full survey + decisions:
-the dossier in `_CAOS_MANAGE/wip/lidar3d/` and [`docs/research/`](docs/research/).
-
-## Quickstart (needs the local NVIDIA GPU)
+## Quickstart (proves the template runs end-to-end)
 
 ```bash
-# 1. Models (~14 GB, Apache-2.0) -> E:\_Models\3D_Spatial_Reconstruction\lingbot-map\
-hf download robbyant/lingbot-map --local-dir E:/_Models/3D_Spatial_Reconstruction/lingbot-map
-# 2. Demo data (301 MB) -> E:\_Datos\3D_Spatial_Reconstruction\lingbot-map-examples\  (the 4 sequences)
-# 3. Environment (Python 3.12 .venv + torch cu126 + vendored lingbot-map)
-scripts/setup.ps1            # Windows   (or: bash scripts/setup.sh)
-# 4. Run
-.venv/Scripts/python.exe run_app.py     # -> http://127.0.0.1:8120
+# 1. create the reproducible environment (.venv + pinned per-need requirements)
+./scripts/setup.sh                      # or scripts/setup.ps1 on Windows PowerShell
+
+# 2. run the offline pipeline over every case → data/artifacts/ + manifests/
+./scripts/precompute.sh                 # or scripts/precompute.ps1
+
+# 3. the tests (determinism, both data contracts, the gate, parity)
+.venv/bin/python -m pytest              # .venv/Scripts/python.exe on Windows
+
+# 4. the web app consumes the artifacts (copy-data enforces the artifact contract)
+cd web && npm install && node copy-data.mjs && npm run dev
 ```
 
-Smoke tests: `python scripts/validate_lingbot.py …` (offline recon + PLY), `python scripts/test_engine.py`
-(engine generator), `python scripts/test_ws.py` (end-to-end WebSocket).
+## How to instantiate this template for a NEW product
 
-## Engine roster
+See [docs/guides/00_instantiate.md](docs/guides/00_instantiate.md). In short: copy this tree, rename the
+`productlab` package to `<slug>lab`, **replace the EXAMPLE engine** (`productlab/stages/process.py`) with your
+product's research-chosen SOTA engine (the one documented in `docs/frameworks/`, pinned in
+`requirements-precompute.txt` — e.g. Yade/Chrono for DEM, OR-Tools for dispatch, MintPy for InSAR), write your
+ingestion contract + cases, and fill the `docs/` wiki **as you build, not at the end** (ADR-0056).
 
-| Engine | Role | License | State |
-|---|---|---|---|
-| **lingbot-map** | live streaming video → metric 3D (hero) | Apache-2.0 | **wired** |
-| KISS-ICP | real LiDAR odometry | MIT | planned (phase 3) |
-| VGGT (Commercial) | offline multi-image "instant scene" | commercial-clean | planned (phase 2) |
-| MoGe-2 | single-image preview / low-VRAM | MIT (code) | planned (phase 2) |
-| gsplat | optional 3DGS refinement | Apache-2.0 | planned (phase 3) |
+## Hard rules this template bakes in
 
-## Layout
+- **The deep research is binding, not decoration.** Every engine/solver/library the research selected lives in
+  `docs/frameworks/<tool>/` *and* `requirements-precompute.txt`, and the pipeline actually uses it. No hand-rolled
+  substitute for a SOTA engine the research prescribed.
+- **Standard formats end-to-end** (`productlab/io/formats.py`): domain-standard in, compact-standard out.
+- **Reproducible**: pinned requirements per need; `scripts/setup`; CI installs them and runs a pipeline smoke.
+- **Applicable to new data**: the ingestion contract is the bring-your-own-data door.
+- **Versioned** (X.XX.XXX, CHANGELOG + tags from day 1) with **license/attribution hygiene**.
 
-```
-app/            FastAPI backend: config, geometry, server, engines/ (base + lingbot + registry)
-web/            three.js viewer + SimLab-style shell (index.html, css/, js/)
-scripts/        setup/dev (.ps1+.sh), validate_lingbot.py, test_engine.py, test_ws.py
-third_party/    vendored lingbot-map source (Apache-2.0, code only)
-docs/           research/ (paper library + reports), wiki (in progress)
-data/           manifest -> E: (heavy data never in git)
-```
-
-## Roadmap
-
-- **Phase 1 (done):** real streaming `LingbotEngine` + WebSocket + three.js App, screenshot-verified.
-- **Phase 2:** full 6-page SimLab shell (Introduction / Methodology / Implementation / Experiments /
-  Benchmark) authored from the research; VGGT + MoGe-2 engines; upload + synthetic sources; export.
-- **Phase 3 (novel agenda):** loop closure / pose-graph; KISS-ICP LiDAR fusion; gsplat refinement.
-- **Phase 4:** offline Benchmark runs + reproduced SOTA tables; complete `docs/` wiki (ADR-0056).
-
-## Credits / licenses
-
-Built around **lingbot-map** ("Geometric Context Transformer for Streaming 3D Reconstruction",
-arXiv:2604.14141, Apache-2.0), vendored under `third_party/lingbot-map/` (see its `LICENSE.txt`). This
-repo is private research; engine licenses are tracked per-engine above (some weights are non-commercial,
-flagged for any future product use).
+See [docs/architecture/01_overview.md](docs/architecture/01_overview.md) for the full rationale.

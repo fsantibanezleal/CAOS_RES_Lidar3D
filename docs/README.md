@@ -1,20 +1,20 @@
-# docs/ — Lidar 3D documentation wiki
+# Docs — the product wiki
 
-Navigable docs authored as the lab is versioned (ADR-0056). Current state: the **research library**
-is complete; the per-theme deep wiki (theory / equations / data-contract / tool-usage) is authored in
-Phase 2 alongside the 6-page app.
+SimLab-style navigable wiki (ADR-0056), authored **as the product is built**, not at the end. The pipeline +
+its validation + these docs are the primary product; the web app is a projection of a validated subset.
 
-## Sections
+## Map
+- **[architecture/](architecture/)** — how the repo works: the frozen base, the two data contracts, determinism +
+  trace, the live/precompute gate, the staged pipeline, model evaluation, deploy.
+- **[frameworks/](frameworks/)** — one card per research-chosen engine/library (what/why · install · usage ·
+  applying). The deep research, made binding (each is pinned in a `requirements-*.txt`).
+- **[guides/](guides/)** — runnable how-tos: **instantiate the template**, run the precompute pipeline,
+  **bring your own data**, the GPU lane, run the API.
+- **[cases/](cases/)** — the CATEGORY taxonomy + the coverage matrix + one page per documented case.
 
-- [`research/`](research/) — **the reference library**: 17 paper PDFs + the four SOTA survey reports
-  (feed-forward 3D, LiDAR SLAM, 3DGS + web viz, the lingbot-map deep dive). Start at
-  [`research/README.md`](research/README.md).
-- `assets/` — figures (the verified workbench screenshots).
-- *(Phase 2)* `theory/` — streaming reconstruction formalism (pose/depth/pointmap, the GCT, KV cache).
-- *(Phase 2)* `frameworks/lingbot-map/` — how the engine is called, the 8 GB-safe config, gotchas.
-- *(Phase 2)* `data/` — the data contract (sources, intrinsics-free input, depth → world unprojection).
-
-## The project dossier (thinking layer)
-
-The figured-out research, proposal and plan live in `_CAOS_MANAGE/wip/lidar3d/` (and graduate to
-`_CAOS_MANAGE/plans/lidar3d/`). This repo holds the **code + the committed reference library**.
+## Honesty + data policy
+- Numbers come from the calibrated engine / committed artifacts, never from a claim. The EXAMPLE engine (SIR) is
+  synthetic and clearly labelled; a real product states sources, licenses and what is real vs synthetic.
+- Public derived artifacts are committed (`data/derived/`); raw/private sources stay out of git (`data/raw/`,
+  vault) per ADR-0055. The two data contracts ([architecture/08_data-contracts.md](architecture/08_data-contracts.md))
+  govern raw→pipeline and pipeline→web.
