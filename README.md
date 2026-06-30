@@ -1,62 +1,78 @@
-# CAOS product template — a REAL product repo (not a demo)
+# CAOS_RES_Lidar3D — streaming 3D reconstruction lab
 
-This is the **canonical template** every Faena/CAOS data-product repo is instantiated from. It exists because
-ad-hoc products (bespoke scripts, baked cases, no reproducible env, no data contract) kept shipping — they
-*look* done but **cannot be applied to new data**, so they are demos, not tools. This template makes the standard
-**executable**: clone it, run two scripts, and you have a reproducible offline pipeline that ingests data in a
-**standard format**, processes it through **typed, seeded, tested stages**, emits **committed standard-format
-artifacts + a manifest**, and feeds a web app that **replays** them — and that any third party can point at
-**their own data**.
+> **Lidar 3D** turns a video stream into a camera trajectory, dense metric depth, and an RGB point cloud,
+> feed-forward and in real time, with **no per-scene optimization**. It is built around **lingbot-map**
+> (arXiv:2604.14141), the 2026 state of the art for *streaming* feed-forward reconstruction (Apache-2.0),
+> instantiated from the CAOS product archetype (ADR-0057).
 
-It is modelled on the validated exemplar **CAOS_SIMLAB** (`simlab/pipeline.py`, `requirements-*.txt`,
-`scripts/setup+precompute`, `docs/frameworks`, `data/artifacts`, `manifests/`).
+![Lidar 3D workbench](docs/assets/workbench.png)
 
-## The two data contracts (the thing that was missing everywhere)
+Research repo (ADR-0050 location · ADR-0057 product): local-first, heavy models/data on a scratch volume
+(env-resolved, never in git). **Status v0.02.000** — backbone + frontend built and verified.
 
-A product is only real if data flows through **two enforced contracts**:
+## Three lanes (ADR-0057)
 
-1. **Ingestion contract — `raw → processing`.** `productlab/io/contract.py` defines the required schema (columns,
-   units, ranges) of an input dataset and an explicit **outlier policy** (reject / clip / flag). This is the
-   *"bring your own data"* gate: a user's dataset is accepted iff it satisfies the contract. Documented in
-   [docs/data-contract.md](docs/data-contract.md).
-2. **Artifact contract — `processing → web`.** Every pipeline run writes a compact, standard-format artifact and a
-   `manifests/<case>.json` (params, seed, run_ms, bytes, gate verdict, format/version). The web app loads **only**
-   these — it never recomputes — and a TS type mirrors the manifest schema so a contract drift fails the build.
+The engine is a ~1B-parameter ViT needing a GPU, so it is not browser-feasible. The lab separates:
 
-If either contract is missing, the product is a demo. CI enforces both.
+| Lane | What | Where |
+|---|---|---|
+| **Offline / precompute** | the real lingbot-map engine bakes committed artifacts | `data-pipeline/lidar3dlab/stages` (GPU) |
+| **Replay (public web)** | the static SPA renders those artifacts | `frontend/` (GitHub Pages, Lane B) |
+| **Live (dormant)** | real-time reconstruction of your own footage | `app/` local-GPU API |
 
-## Quickstart (proves the template runs end-to-end)
+## Quickstart
 
 ```bash
-# 1. create the reproducible environment (.venv + pinned per-need requirements)
-./scripts/setup.sh                      # or scripts/setup.ps1 on Windows PowerShell
-
-# 2. run the offline pipeline over every case → data/artifacts/ + manifests/
-./scripts/precompute.sh                 # or scripts/precompute.ps1
-
-# 3. the tests (determinism, both data contracts, the gate, parity)
-.venv/bin/python -m pytest              # .venv/Scripts/python.exe on Windows
-
-# 4. the web app consumes the artifacts (copy-data enforces the artifact contract)
-cd web && npm install && node copy-data.mjs && npm run dev
+# 1. Environment (Python 3.12 .venv + the precompute deps; torch + the vendored engine per docs/frameworks/lingbot-map)
+scripts/setup.ps1                                   # or: bash scripts/setup.sh
+# 2. Bake the synthetic CPU case (no GPU/model needed) — proves the pipeline end-to-end
+.venv/Scripts/python.exe -m lidar3dlab.pipeline SYN_orbit
+# 3. Bake a real sequence (needs the GPU + the env paths from the vault)
+LIDAR3D_MODELS_ROOT=… LIDAR3D_DATA_ROOT=… .venv/Scripts/python.exe -m lidar3dlab.pipeline oxford
+# 4. The replay web app
+cd frontend && npm install && npm run build && npm run preview
 ```
 
-## How to instantiate this template for a NEW product
+There is **no root `run_app.py`**: the pipeline is `python -m lidar3dlab.pipeline <case>`; the live API is
+the dormant `app/`. The frontend replays the committed artifacts (`copy-data.mjs` enforces the artifact
+contract).
 
-See [docs/guides/00_instantiate.md](docs/guides/00_instantiate.md). In short: copy this tree, rename the
-`productlab` package to `<slug>lab`, **replace the EXAMPLE engine** (`productlab/stages/process.py`) with your
-product's research-chosen SOTA engine (the one documented in `docs/frameworks/`, pinned in
-`requirements-precompute.txt` — e.g. Yade/Chrono for DEM, OR-Tools for dispatch, MintPy for InSAR), write your
-ingestion contract + cases, and fill the `docs/` wiki **as you build, not at the end** (ADR-0056).
+## What works (verified 2026-06-30)
 
-## Hard rules this template bakes in
+- **Real engine in a compliant staged pipeline**: `preprocess → feature_extraction → train(dormant) →
+  infer → refine(color/texture) → evaluate → export`, with the two enforced data contracts (RGB-sequence
+  ingestion + the artifact manifest, mirrored by the TS types) and the measured lane gate.
+- **Verified bakes**: `SYN_orbit` (synthetic, CPU, CI-safe) and the real sequences `oxford / university /
+  loop / courthouse` on an RTX 4070 (8 GB-safe: SDPA, CPU-offload, window=16, bf16). oxford = 193k-pt RGB
+  cloud, 3.13 m, lane=precompute. No personal paths are ever committed.
+- **Frontend (ADR-0016 + ADR-0058)**: a 6-page shell (App / Introduction / Methodology / Implementation /
+  Experiments / Benchmark), header with nav + github/personal/portfolio icons + EN/ES + light/dark + the ⓘ
+  architecture modal, footer; the App is a workbench with a **three.js RGB-colored point-cloud viewer** +
+  camera-frustum trajectory + per-frame depth + stats. Screenshot-verified, zero JS errors.
+- **Tests + CI**: ruff + pytest (the synthetic case is the CI smoke) + the CONTRACT-2 drift guard + the
+  base-integrity guards (no `.env`, no venv/binaries, no leaked machine paths).
 
-- **The deep research is binding, not decoration.** Every engine/solver/library the research selected lives in
-  `docs/frameworks/<tool>/` *and* `requirements-precompute.txt`, and the pipeline actually uses it. No hand-rolled
-  substitute for a SOTA engine the research prescribed.
-- **Standard formats end-to-end** (`productlab/io/formats.py`): domain-standard in, compact-standard out.
-- **Reproducible**: pinned requirements per need; `scripts/setup`; CI installs them and runs a pipeline smoke.
-- **Applicable to new data**: the ingestion contract is the bring-your-own-data door.
-- **Versioned** (X.XX.XXX, CHANGELOG + tags from day 1) with **license/attribution hygiene**.
+## Layout (instantiated from `template_repo_product`, ADR-0057)
 
-See [docs/architecture/01_overview.md](docs/architecture/01_overview.md) for the full rationale.
+```
+data-pipeline/lidar3dlab/   engine + staged pipeline: io/{schema,contract,formats} · core/{gate,manifest,
+                            trace,rng} · model/{geometry,synthetic,lingbot} · stages/* · cases · pipeline.py
+frontend/                   the replay SPA (React 19 + Vite + three.js + KaTeX)
+app/                        dormant FastAPI live lane
+data/derived + manifests/   committed compact artifacts (CONTRACT 2)
+docs/                       architecture · frameworks/lingbot-map · cases · guides · research (surveys)
+tests/ · .github/workflows/ pytest + ruff + pipeline smoke + guards
+third_party/lingbot-map/    the vendored engine (Apache-2.0)
+```
+
+## Roadmap (the novel agenda)
+
+Beyond using SOTA, the lab pursues lingbot-map's three stated gaps: **loop closure** (pose-graph over the
+trajectory memory), **camera↔LiDAR fusion**, and **test-time refinement** (textured mesh / 3DGS). Each is
+evaluated rigorously, null results kept. See `_CAOS_MANAGE/wip/lidar3d/` for the research dossier.
+
+## Credits / license
+
+Built around **lingbot-map** (arXiv:2604.14141, Apache-2.0), vendored under `third_party/`. This repo is
+private research; engine/weight licenses tracked per-engine (some are non-commercial, flagged before any
+product use).

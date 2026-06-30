@@ -21,8 +21,8 @@ jobs:
         run: ruff check data-pipeline tests
       - name: Tests
         run: pytest
-      - name: Pipeline smoke (regenerate one case)
-        run: python -m lidar3dlab.pipeline EX02_epidemic
+      - name: Pipeline smoke (regenerate the synthetic CPU case)
+        run: python -m lidar3dlab.pipeline SYN_orbit
       - name: CONTRACT 2 — manifests <-> artifacts consistent (no drift)
         run: python scripts/check_artifacts.py
 

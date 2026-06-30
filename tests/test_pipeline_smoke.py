@@ -1,28 +1,22 @@
-"""Pipeline smoke + determinism: a case regenerates deterministically (same seed -> identical artifact), the
-degenerate control runs without crashing, and run_all writes the flat index."""
+"""Pipeline smoke + determinism: the synthetic case regenerates deterministically (same seed -> identical
+artifact bytes) and produces a sensible colored cloud + trajectory, on CPU, with no GPU/model."""
 import json
 
-from lidar3dlab import pipeline, registry
+from lidar3dlab import pipeline
 
 
-def test_case_deterministic_same_seed():
-    a = pipeline.precompute("EX02_epidemic", seed=7)
-    b = pipeline.precompute("EX02_epidemic", seed=7)
-    assert a["artifact"]["bytes"] == b["artifact"]["bytes"]
+def test_synthetic_deterministic_same_seed():
+    a = pipeline.precompute("SYN_orbit", seed=7)
+    b = pipeline.precompute("SYN_orbit", seed=7)
+    assert a["artifact"]["bytes"] == b["artifact"]["bytes"], "synthetic bake is not deterministic"
     trace = json.loads((pipeline.DERIVED / a["artifact"]["path"]).read_text(encoding="utf-8"))
-    assert trace["summary"]["peak_I"] > 0
+    assert trace["schema"].startswith("lidar3d.recon/")
+    assert trace["n_points"] > 1000, "implausibly few points"
+    assert trace["summary"]["path_length_m"] > 0, "no camera trajectory"
+    assert len(trace["points_b64"]) > 0 and len(trace["colors_b64"]) > 0, "missing cloud / colors"
 
 
-def test_degenerate_control_runs():
-    m = pipeline.precompute("CTRL_degenerate", seed=1)  # I0=0 -> no dynamics, must not crash
-    trace = json.loads((pipeline.DERIVED / m["artifact"]["path"]).read_text(encoding="utf-8"))
-    assert trace["summary"]["peak_I"] == 0.0
-    assert trace["summary"]["attack_rate"] == 0.0
-
-
-def test_run_all_writes_index():
-    entries = pipeline.run_all(seed=42)
-    assert len(entries) == len(registry.list_cases()) >= 4
-    idx = json.loads((pipeline.MANIFESTS / "index.json").read_text(encoding="utf-8"))
-    assert idx["n_cases"] == len(entries)
-    assert idx["schema"].startswith("example.index/")
+def test_synthetic_runs_on_cpu_precompute():
+    m = pipeline.precompute("SYN_orbit", seed=1)
+    assert m["lane"] == "precompute"
+    assert m["engine"]["pretrained"] is False  # synthetic engine, not the pretrained model

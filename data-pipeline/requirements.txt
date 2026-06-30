@@ -1,6 +1,14 @@
-# PRECOMPUTE lane — the heavy, research-chosen SOTA engines, in the .venv-pipeline (local-only, never deployed).
-# THIS is where the deep research becomes binding: every engine pinned here is documented in docs/frameworks/<tool>/
-# and actually used by data-pipeline/lidar3dlab/stages/. The EXAMPLE engine (SIR) is numpy-only on purpose so the
-# template installs instantly with no native build; a real product adds e.g. yade / pychrono / ortools / mintpy /
-# torch here, each PINNED to the version it installs+verifies.
-numpy==2.4.6
+# PRECOMPUTE lane deps (the .venv-pipeline, local-only). The deep research becomes binding here: each engine
+# is documented in docs/frameworks/<tool>/ and actually used by data-pipeline/lidar3dlab/stages/.
+#
+# The SYNTHETIC CPU engine + the contracts + export need only these (so CI smoke-tests SYN_orbit with no GPU):
+numpy>=1.26
+matplotlib>=3.8        # depth thumbnails (core/geometry.depth_to_png_b64)
+pillow>=10             # PNG encode for the thumbnails
+opencv-python>=4.9     # per-frame quality features (stages/feature_extraction; real sequences only)
+#
+# The REAL engine (stages/infer -> model/lingbot) additionally needs torch + the vendored lingbot-map; those are
+# installed by scripts/setup with the CUDA wheel index matching the local driver (NOT pinned here, NOT in CI):
+#   pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
+#   pip install -e third_party/lingbot-map --no-deps     # vendored, Apache-2.0
+# Optional refine/texture lane: open3d (CPU mesh) ; gsplat (3DGS, needs nvcc).

@@ -94,8 +94,8 @@ ONNX Runtime (sky segmentation), NVIDIA **Kaolin** (batch render), **Open3D** (p
 
 **Checkpoints (HF `robbyant/lingbot-map`, Apache-2.0, 28.06 GB total):**
 `lingbot-map.pt` (4.63 GB, balanced) · `lingbot-map-long.pt` (4.63 GB, long sequences) ·
-`lingbot-map-stage1.pt` (4.76 GB, bidirectional/offline). → downloading to
-`E:\_Models\3D_Spatial_Reconstruction\lingbot-map\`.
+`lingbot-map-stage1.pt` (4.76 GB, bidirectional/offline). Stored on an external scratch volume under
+`$LIDAR3D_MODELS_ROOT/lingbot-map/` (never in git).
 
 ## 7. Author-stated limitations (→ our differentiation opportunities)
 
