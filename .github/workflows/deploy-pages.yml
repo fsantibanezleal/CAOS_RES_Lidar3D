@@ -19,13 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Regenerate artifacts (fresh deterministic replay outputs)
-        run: |
-          pip install -r data-pipeline/requirements.txt -e .
-          python -m lidar3dlab.pipeline all
+      # The committed data/derived artifacts ARE the replay source: the real cases were baked OFFLINE on a
+      # GPU (CI has neither GPU nor the 4.6 GB model), so CI must NOT re-bake (that would drop them and leave
+      # only the synthetic cases). copy-data.mjs overlays the committed artifacts into the SPA at build time.
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
