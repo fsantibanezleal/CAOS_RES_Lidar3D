@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="What the app is — placeholder, specialise per product">
+  <!-- PLACEHOLDER (template). Each product REPLACES this with a diagram of its own
+       domain: the real problem, the inputs, the science core, the value it returns.
+       Keep the shell CSS-variable tokens so it stays themed. -->
+  <style>
+    .arch-svg text { font-family: var(--font-sans, Inter, "Segoe UI", system-ui, sans-serif); }
+    .arch-svg .mono { font-family: var(--font-mono, ui-monospace, Consolas, monospace); }
+    .arch-svg .bx { fill: var(--color-surface-2); stroke: var(--color-border); stroke-width: 1.2; }
+    .arch-svg .bx-hi { stroke: var(--color-accent); }
+    .arch-svg .bx-good { stroke: var(--color-good); }
+    .arch-svg .ttl { fill: var(--color-fg); font-size: 13px; font-weight: 700; }
+    .arch-svg .sub { fill: var(--color-fg-subtle); font-size: 10px; }
+    .arch-svg .it { fill: var(--color-fg); font-size: 11px; }
+    .arch-svg .cd { fill: var(--color-accent); font-size: 9.5px; }
+    .arch-svg .mu { fill: var(--color-fg-subtle); font-size: 10px; }
+    .arch-svg .flow { fill: none; stroke: var(--color-fg-faint); stroke-width: 1.6; }
+    .arch-svg .ph { fill: var(--color-warn); font-size: 10px; font-weight: 600; }
+  </style>
+  <defs>
+    <marker id="ta-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--color-fg-faint)"/>
+    </marker>
+  </defs>
+
+  <text class="ttl" x="22" y="30">What the app is</text>
+  <text class="ph" x="22" y="47">PLACEHOLDER — replace with this product's domain problem → input → method → value</text>
+
+  <rect class="bx bx-hi" x="20" y="74" width="194" height="150" rx="11"/>
+  <text class="it" x="34" y="100">The problem</text>
+  <text class="mu" x="34" y="120">a real mining /</text>
+  <text class="mu" x="34" y="136">operations question</text>
+  <text class="mu" x="34" y="156">answered from data</text>
+  <text class="cd mono" x="34" y="182">products/&lt;slug&gt;.md</text>
+
+  <rect class="bx" x="248" y="74" width="194" height="150" rx="11"/>
+  <text class="it" x="262" y="100">The input</text>
+  <text class="mu" x="262" y="120">a measurement,</text>
+  <text class="mu" x="262" y="136">image, or signal</text>
+  <text class="mu" x="262" y="156">(Contract 1)</text>
+  <text class="cd mono" x="262" y="182">data/examples/*</text>
+
+  <rect class="bx bx-hi" x="476" y="74" width="194" height="150" rx="11"/>
+  <text class="it" x="490" y="100">The method</text>
+  <text class="mu" x="490" y="120">SOTA, real — a</text>
+  <text class="mu" x="490" y="136">classical baseline</text>
+  <text class="mu" x="490" y="156">+ a learned model</text>
+  <text class="cd mono" x="490" y="182">src/&lt;domain&gt;/ · *.onnx</text>
+
+  <rect class="bx bx-good" x="704" y="74" width="176" height="150" rx="11"/>
+  <text class="it" x="718" y="100">The value</text>
+  <text class="mu" x="718" y="120">a decision-grade</text>
+  <text class="mu" x="718" y="136">number + an</text>
+  <text class="mu" x="718" y="156">interactive readout</text>
+  <text class="cd mono" x="718" y="182">pages/Tool.tsx</text>
+
+  <path class="flow" d="M214,149 H246" marker-end="url(#ta-arrow)"/>
+  <path class="flow" d="M442,149 H474" marker-end="url(#ta-arrow)"/>
+  <path class="flow" d="M670,149 H702" marker-end="url(#ta-arrow)"/>
+
+  <rect class="bx" x="20" y="256" width="860" height="180" rx="11"/>
+  <text class="it" x="36" y="282">It is a real system, not a demo:</text>
+  <text class="mu" x="36" y="306">• a deterministic engine that recomputes live in the browser on every control — no mocked outputs;</text>
+  <text class="mu" x="36" y="328">• an offline pipeline with two validated data contracts, so you can run it on YOUR data, not just the built-in cases;</text>
+  <text class="mu" x="36" y="350">• a learned model trained from real / sourced data and exported to ONNX, running client-side next to a classical baseline;</text>
+  <text class="mu" x="36" y="372">• six documented pages (App · Introduction · Methodology · Implementation · Experiments · Benchmark);</text>
+  <text class="mu" x="36" y="394">• an honest record: every number is sourced or labelled synthetic, every limitation stated.</text>
+  <text class="cd mono" x="36" y="420">replace the four boxes above with the concrete nouns of THIS product (e.g. muckpile image → watershed → PSD → P80).</text>
+</svg>

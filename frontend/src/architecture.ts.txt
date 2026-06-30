@@ -1,0 +1,121 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  Architecture / "How it works" modal config (ADR-0058).
+//  COPY this file to  frontend/src/architecture.ts  when you build the product's
+//  shell-based frontend, fill in the product-specific copy, and pass it to the
+//  AppShell:   <AppShell config={{ ...shellConfig, architecture }}>
+//
+//  It is shipped here as .ts.txt (not .ts) so it does NOT enter the template's
+//  tsc build — the template frontend is the minimal replay SPA and has no shell
+//  dependency. Your product frontend DOES depend on @fasl-work/caos-app-shell,
+//  so once renamed to .ts the import below resolves.
+//
+//  The five tabs below are the ADR-0058 minimum (never fewer):
+//    (1) the app · (2) lanes — web/offline/compute · (3) web-app flow ·
+//    (4) the science · (5) the data contracts / design.
+//  Tabs (2)(3)(5) are archetype-generic — the placeholder SVGs already shipped
+//  in public/svg/tech/ are reusable as-is. Tabs (1)(4) are product-specific —
+//  replace public/svg/tech/01-the-app.svg and 04-the-science.svg with real
+//  diagrams of THIS product's domain + algorithm.
+// ─────────────────────────────────────────────────────────────────────────────
+import type { ArchitectureConfig } from '@fasl-work/caos-app-shell';
+
+export const architecture: ArchitectureConfig = {
+  tabs: [
+    {
+      id: 'app',
+      en: 'The app',
+      es: 'La app',
+      svg: 'svg/tech/01-the-app.svg',
+      body_en:
+        'WHAT THIS PRODUCT IS — one short paragraph: the real mining/operations question it answers, ' +
+        'the input it takes, the decision-grade value it returns.\n\n' +
+        'It is a real system, not a demo: a deterministic engine recomputes live in the browser on every ' +
+        'control, an offline pipeline with two data contracts lets you run it on your own data, and a ' +
+        'learned model (ONNX) runs client-side next to a classical baseline.',
+      body_es:
+        'QUÉ ES ESTE PRODUCTO — un párrafo: la pregunta real de minería/operación que responde, la entrada ' +
+        'que toma, el valor accionable que entrega.\n\n' +
+        'Es un sistema real, no un demo: un motor determinista recalcula en vivo en el navegador con cada ' +
+        'control, un pipeline offline con dos contratos de datos permite correrlo con tus propios datos, y ' +
+        'un modelo aprendido (ONNX) corre en el cliente junto a un baseline clásico.',
+    },
+    {
+      id: 'lanes',
+      en: 'Lanes — web / offline / compute',
+      es: 'Carriles — web / offline / cómputo',
+      svg: 'svg/tech/02-lanes.svg',
+      body_en:
+        'Three lanes, and the split is the point. WEB (live, in the browser): the TypeScript engine re-runs ' +
+        'on every control and onnxruntime-web runs the ONNX models — no server. OFFLINE / COMPUTE (your ' +
+        'machine, isolated .venv): the Python pipeline bakes the canonical artifacts and the heavy lane ' +
+        '(--retrain, .venv-precompute, torch) trains the models and exports them to ONNX. REPLAY: the small, ' +
+        'committed artifacts in data/derived are overlaid into the SPA by copy-data.mjs and loaded live; the ' +
+        'typed mirror (contract.types.ts) fails the build if the web and the pipeline shapes ever diverge.',
+      body_es:
+        'Tres carriles, y la división es lo central. WEB (en vivo, en el navegador): el motor TypeScript ' +
+        're-corre con cada control y onnxruntime-web ejecuta los modelos ONNX — sin servidor. OFFLINE / ' +
+        'CÓMPUTO (tu máquina, .venv aislado): el pipeline Python hornea los artefactos canónicos y el carril ' +
+        'pesado (--retrain, .venv-precompute, torch) entrena los modelos y los exporta a ONNX. REPLAY: los ' +
+        'artefactos pequeños y versionados en data/derived se superponen al SPA con copy-data.mjs y se cargan ' +
+        'en vivo; el espejo tipado (contract.types.ts) rompe el build si la web y el pipeline divergen.',
+    },
+    {
+      id: 'web-flow',
+      en: 'Web-app flow',
+      es: 'Flujo de la web',
+      svg: 'svg/tech/03-web-flow.svg',
+      body_en:
+        'The App page recomputes live: inputs (the case selector or your own dropped data, plus sliders and ' +
+        'toggles) feed the TypeScript engine and onnxruntime-web inference, which feed the interactive viz ' +
+        'that reads values back on hover and marks uncertain results. The six sibling pages (App · ' +
+        'Introduction · Methodology · Implementation · Experiments · Benchmark) are identical across every ' +
+        'product. The build is gated by the contract-type mirror, the artifacts are overlaid by copy-data, ' +
+        'vite builds the static output, and GitHub Pages serves it at <slug>.fasl-work.com.',
+      body_es:
+        'La página App recalcula en vivo: las entradas (el selector de casos o tus datos soltados, más sliders ' +
+        'y toggles) alimentan el motor TypeScript y la inferencia onnxruntime-web, que alimentan la ' +
+        'visualización interactiva que devuelve valores al pasar el cursor y marca resultados inciertos. Las ' +
+        'seis páginas hermanas (App · Introducción · Metodología · Implementación · Experimentos · Benchmark) ' +
+        'son idénticas en todos los productos. El build lo controla el espejo de tipos del contrato, los ' +
+        'artefactos los superpone copy-data, vite construye el estático y GitHub Pages lo sirve en ' +
+        '<slug>.fasl-work.com.',
+    },
+    {
+      id: 'science',
+      en: 'The science',
+      es: 'La ciencia',
+      svg: 'svg/tech/04-the-science.svg',
+      body_en:
+        'THE ALGORITHM, STEP BY STEP — replace with this product\'s real stages and equations (e.g. muckpile ' +
+        'image → foreground → watershed delineation → particle-size distribution → Rosin–Rammler fit). Every ' +
+        'result is measured against a transparent classical baseline; the learned model is reported with its ' +
+        'held-out skill versus that baseline, never as an unfalsifiable black box.',
+      body_es:
+        'EL ALGORITMO, PASO A PASO — reemplaza con las etapas y ecuaciones reales de este producto (p. ej. ' +
+        'imagen de muckpile → foreground → delineación watershed → distribución de tamaño de partícula → ' +
+        'ajuste Rosin–Rammler). Cada resultado se mide contra un baseline clásico transparente; el modelo ' +
+        'aprendido se reporta con su skill en held-out frente a ese baseline, nunca como una caja negra.',
+    },
+    {
+      id: 'design',
+      en: 'Data contracts / design',
+      es: 'Contratos de datos / diseño',
+      svg: 'svg/tech/05-data-contracts.svg',
+      body_en:
+        'Two validated data contracts bracket the pipeline. Contract 1 (ingestion) defines what a valid input ' +
+        'case looks like — field names, dtypes, units, range/NaN/outlier guards — so the app accepts your data, ' +
+        'not just the built-in cases. Contract 2 (artifact) defines the output shape the web reads ' +
+        '(case-results.json, the model index), mirrored exactly by contract.types.ts. Between them the staged, ' +
+        'deterministic pipeline runs the lane gate (numpy-light by default, --retrain for the heavy lane) and ' +
+        'writes a provenance manifest, so every result is reproducible and the web can never silently drift.',
+      body_es:
+        'Dos contratos de datos validados encierran el pipeline. El Contrato 1 (ingesta) define cómo se ve un ' +
+        'caso de entrada válido — nombres de campo, dtypes, unidades, guardas de rango/NaN/outliers — para que ' +
+        'la app acepte tus datos, no sólo los casos incluidos. El Contrato 2 (artefacto) define la forma de ' +
+        'salida que lee la web (case-results.json, el índice de modelos), espejada exactamente por ' +
+        'contract.types.ts. Entre ambos, el pipeline por etapas y determinista corre el lane gate (numpy-light ' +
+        'por defecto, --retrain para el carril pesado) y escribe un manifest de procedencia, de modo que cada ' +
+        'resultado es reproducible y la web nunca diverge en silencio.',
+    },
+  ],
+};

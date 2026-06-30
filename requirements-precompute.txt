@@ -1,9 +1,0 @@
-# Heavy reconstruction engine. Install AFTER requirements.txt with the CUDA wheel index that
-# matches the local driver. This host: NVIDIA driver 560.94 -> CUDA 12.6 -> torch cu126.
-#   pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
-#   pip install -e third_party/lingbot-map --no-deps        # vendored, Apache-2.0
-# Optional (not required for the streaming App; skipped on this host — no nvcc):
-#   flashinfer-python   # paged KV-cache kernel (we use --use_sdpa instead)
-# Phase-2/3 engines (add when wired):
-#   gsplat   # 3DGS refinement (Apache-2.0)
-#   kiss-icp # real LiDAR odometry (MIT)
