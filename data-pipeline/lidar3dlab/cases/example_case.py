@@ -30,6 +30,27 @@ def _real(seq: str, max_frames: int = 96) -> SequenceSpec:
     return SequenceSpec(case_id=seq, source_dir=str(sequence_dir(seq)), n_frames=0, max_frames=max_frames)
 
 
+# Real camera intrinsics "fx,fy,cx,cy,W,H" (native px) for a geometrically consistent unprojection (vs a wrong fixed FoV).
+_TUM1 = "517.306,516.469,318.643,255.314,640,480"    # TUM freiburg1
+_TUM2 = "520.909,521.007,325.141,249.701,640,480"    # TUM freiburg2
+_TUM3 = "535.4,539.2,320.1,247.6,640,480"            # TUM freiburg3
+_S7 = "585,585,320,240,640,480"                       # Microsoft 7-Scenes (Kinect)
+_ICL = "481.2,480.0,319.5,239.5,640,480"              # ICL-NUIM
+
+
+def _own(cid: str, subpath: str, expected: str, dataset: str, license: str, intr: str, frames: int = 240,
+         glob: str = "", max_depth: float = 5.0) -> Case:
+    """An OUR-model case: point the from-scratch/pretrained depth+pose engine at any folder of ordered RGB frames
+    under DATA_ROOT/train/. `frames` = (larger) coverage cap; `glob` selects the RGB frames when the folder mixes
+    files ("*.color.png" for 7-Scenes); `intr` = real intrinsics for a correct cloud; `max_depth` drops far points
+    (which amplify pose error into scatter) so the accumulated cloud stays sharp."""
+    return Case(cid, "ours: trained depth+pose model",
+                SequenceSpec(cid, source_dir=str(DATA_ROOT / "train" / subpath), n_frames=0, max_frames=frames,
+                             decimation=2, conf_quantile=0.65, engine="own-depthpose", frame_glob=glob,
+                             intrinsics=intr, max_render_depth=max_depth),
+                expected, "real", dataset=dataset, license=license)
+
+
 CASES: list[Case] = [
     Case("SYN_orbit", "synthetic: camera, procedural corridor (CPU, CI)",
          SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=120, max_frames=120,
@@ -40,12 +61,30 @@ CASES: list[Case] = [
                       synthetic=True, modality="lidar"),
          "forward LiDAR sweep down a corridor; point-to-plane ICP odometry recovers a ~9 m path; height-colored map",
          "synthetic"),
-    Case("OWN_tum_desk", "ours: trained depth+pose model (TUM RGB-D)",
-         SequenceSpec("OWN_tum_desk",
-                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk" / "rgb"),
-                      n_frames=0, max_frames=120, decimation=2, conf_quantile=0.6, engine="own-depthpose"),
-         "OUR from-scratch depth+pose model (trained on TUM RGB-D, ~0.2 m held-out ATE) reconstructs a desk sweep",
-         "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    _own("OWN_tum_desk", "tum-rgbd/rgbd_dataset_freiburg1_desk/rgb",
+         "OUR depth+pose model (pretrained ResNet-18 backbone + our decoder/pose, trained on TUM RGB-D + ICL-NUIM) reconstructs a desk sweep",
+         "TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", "CC BY 4.0 (TUM RGB-D)", _TUM1),
+    _own("OWN_tum_office", "tum-rgbd/rgbd_dataset_freiburg3_long_office_household/rgb",
+         "OUR model on a TRULY HELD-OUT office sweep (freiburg3_long_office is the evaluation sequence, never trained on): honest generalization",
+         "TUM RGB-D (freiburg3_long_office_household, Sturm et al. 2012)", "CC BY 4.0 (TUM RGB-D)", _TUM3, max_depth=6.0),
+    _own("OWN_tum_xyz", "tum-rgbd/rgbd_dataset_freiburg1_xyz/rgb",
+         "OUR model on a translational xyz-calibration sweep: near-planar desktop, tight motion, a clean reconstruction test",
+         "TUM RGB-D (freiburg1_xyz, Sturm et al. 2012)", "CC BY 4.0 (TUM RGB-D)", _TUM1),
+    _own("OWN_tum_desk2", "tum-rgbd/rgbd_dataset_freiburg2_desk/rgb",
+         "OUR model on a longer, wider desk loop (freiburg2): a bigger workspace with more depth range",
+         "TUM RGB-D (freiburg2_desk, Sturm et al. 2012)", "CC BY 4.0 (TUM RGB-D)", _TUM2, max_depth=6.0),
+    _own("OWN_tum_pioneer", "tum-rgbd/rgbd_dataset_freiburg2_pioneer_slam/rgb",
+         "OUR model on a robot (Pioneer) SLAM run through a hall: long fast trajectory, the hardest drift test",
+         "TUM RGB-D (freiburg2_pioneer_slam, Sturm et al. 2012)", "CC BY 4.0 (TUM RGB-D)", _TUM2, max_depth=6.0),
+    _own("OWN_7scenes_heads", "7scenes/heads/seq-01",
+         "OUR model on Microsoft 7-Scenes 'heads' (HELD-OUT relocalization data, never trained on): a tight cluttered desk corner",
+         "7-Scenes (heads, Shotton et al. 2013)", "Microsoft Research 7-Scenes (research use)", _S7, glob="*.color.png"),
+    _own("OWN_7scenes_stairs", "7scenes/stairs/seq-01",
+         "OUR model on Microsoft 7-Scenes 'stairs' (HELD-OUT, never trained on): a repetitive staircase, a texture-ambiguity test",
+         "7-Scenes (stairs, Shotton et al. 2013)", "Microsoft Research 7-Scenes (research use)", _S7, glob="*.color.png"),
+    _own("OWN_icl_living", "icl-nuim/rgb",
+         "OUR model on ICL-NUIM synthetic living-room (perfect-depth synthetic domain, IN the training set via --use_icl): a clean best-case sharpness reference, not held-out",
+         "ICL-NUIM (living_room, Handa et al. 2014)", "ICL-NUIM (research use)", _ICL, max_depth=6.0),
     Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",
          SequenceSpec("kitti_lidar", source_dir=str(DATA_ROOT / "lidar" / "kitti00"), n_frames=0, max_frames=40,
                       modality="lidar"),

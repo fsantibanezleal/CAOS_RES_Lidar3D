@@ -220,6 +220,10 @@ def main() -> None:
                     "backbone": args.backbone, "val_ate": ate}
             torch.save(ckpt, out_dir / f"own-depthpose-{args.backbone}.pt")   # per-backbone archive (never clobbered)
             torch.save(ckpt, out_dir / "own-depthpose.pt")                    # canonical file the engine loads
+            import json as _json
+            (out_dir / "own-depthpose.meta.json").write_text(_json.dumps({    # small sidecar for accurate engine labels
+                "backbone": args.backbone, "val_ate": round(ate, 4), "size": args.size,
+                "base": args.base, "use_icl": args.use_icl}))
 
     if args.smoke:
         print("SMOKE OK")
