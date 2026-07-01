@@ -119,6 +119,34 @@ saved only when ATE improves (a long run can overfit and *degrade* ATE, the "dif
 appended to `experiments.jsonl` so no run is lost. See [Model history](02_model-history.md) for the full record and
 [Experiments log](03_experiments-log.md) for the schema.
 
+## Architecture reference
+
+Working resolution 224×224. The `resnet18` variant (the deployed one):
+
+| Block | Module | Output | Channels |
+|---|---|---|---|
+| Encoder (ImageNet ResNet-18, shared) | stem (conv7×7 s2 + bn + relu) | /2 | 64 |
+| | maxpool + layer1 | /4 | 64 |
+| | layer2 | /8 | 128 |
+| | layer3 | /16 | 256 |
+| | layer4 | /32 | 512 |
+| Depth decoder (ours, UNet skips) | d4: up(x5)⊕x4 → conv×2 | /16 | base·4 |
+| | d3: up⊕x3 | /8 | base·2 |
+| | d2: up⊕x2 | /4 | base |
+| | d1: up⊕x1 | /2 | base |
+| | head (conv1×1) → interpolate to input | 224 | 2 (depth_raw, logvar) |
+| Pose head — `siamese` (default) | global-pool x5 of both frames → MLP(1024→256→128→6) | — | 6 (se(3)) |
+| Pose head — `corr` (experimental) | local correlation of x4 (9×9 window) ⊕ x4 → convnet → MLP → 6 | — | 6 (se(3)) |
+
+- `base = 32` (decoder width). Total ~12.8 M params (ResNet-18 ~11.7 M + our decoder/pose ~1.1 M).
+- Depth output: `D_max·σ(head[0])`, `D_max = 10 m`. Log-variance clamped to [−8, 8].
+- The `scratch` variant replaces the encoder with a from-scratch UNet (~2.2 M params) and the pose head with a small
+  6-channel-input convnet; same forward signature, zero external weights.
+- se(3) exponential (`se3_exp`): our own Rodrigues form, differentiable, maps the 6-vector to a 4×4 transform.
+
+Code: the encoder (`PretrainedEncoder`), decoder (`DepthDecoder`), pose heads (`SiamesePoseHead` / `CorrPoseHead`),
+and `se3_exp` all live in `data-pipeline/lidar3dlab/model/nets/own_depthpose.py`.
+
 ## References
 
 - Kendall & Gal, *What Uncertainties Do We Need in Bayesian Deep Learning for Computer Vision?*, arXiv:1703.04977
