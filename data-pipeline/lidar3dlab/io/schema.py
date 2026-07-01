@@ -25,6 +25,7 @@ class SequenceSpec:
     conf_quantile: float = 0.30  # drop the lowest-confidence pixels
     synthetic: bool = False    # a procedural CPU case (CI-safe; no GPU/model)
     modality: str = "camera"   # "camera" (lingbot / synthetic) or "lidar" (ICP odometry on scans)
+    engine: str = ""           # explicit engine name (model-agnostic registry); "" = auto-dispatch by the above
 
 
 @dataclass(frozen=True)

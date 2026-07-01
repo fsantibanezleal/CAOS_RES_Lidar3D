@@ -28,7 +28,7 @@ def _row(spec) -> dict:
     return {"case_id": spec.case_id, "source_dir": spec.source_dir, "max_frames": spec.max_frames,
             "image_size": spec.image_size, "decimation": spec.decimation, "conf_quantile": spec.conf_quantile,
             "synthetic": spec.synthetic, "kv_window": spec.kv_window, "scale_frames": spec.scale_frames,
-            "camera_iters": spec.camera_iters, "modality": spec.modality}
+            "camera_iters": spec.camera_iters, "modality": spec.modality, "engine": spec.engine}
 
 
 def precompute(case_id: str, seed: int = 42) -> dict:
@@ -48,14 +48,16 @@ def precompute(case_id: str, seed: int = 42) -> dict:
     metrics["n_quality_frames"] = len(feats)
     run_ms = (time.perf_counter() - t0) * 1000.0
 
-    if spec.modality == "lidar":
+    if spec.engine == "own-depthpose":
+        model = "OUR depth+pose net (from scratch, trained on TUM RGB-D)"
+    elif spec.modality == "lidar":
         model = "open3d point-to-plane ICP" + (" (synthetic scans)" if spec.synthetic else " (real LiDAR scans)")
     elif spec.synthetic:
         model = "synthetic-corridor (CPU)"
     else:
         model = "lingbot-map (arXiv:2604.14141)"
     engine = {"package": "lidar3dlab", "version": __version__, "model": model,
-              "pretrained": (spec.modality == "camera" and not spec.synthetic)}
+              "pretrained": (spec.engine == "own-depthpose") or (spec.modality == "camera" and not spec.synthetic)}
     return export.run(case=case, params=spec, result=result, refine_info=refine_info, seed=seed,
                       run_ms=run_ms, flags=rep.flagged, metrics=metrics, engine=engine,
                       derived_dir=str(DERIVED), manifests_dir=str(MANIFESTS))
