@@ -13,4 +13,4 @@ Rename `lidar3dlab` → `<slug>lab` per product. The **single source of physics/
 - `lidar3dlab/cases/` — documented cases
 
 Setup + run: `scripts/setup.{sh,ps1}` then `scripts/precompute.{sh,ps1}`. See
-[../docs/architecture/05_precompute-pipeline.md](../docs/architecture/05_precompute-pipeline.md).
+[../docs/architecture/05_staged-pipeline.md](../docs/architecture/05_staged-pipeline.md).
