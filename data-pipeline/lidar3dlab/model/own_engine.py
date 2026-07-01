@@ -50,7 +50,9 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ck = torch.load(str(ckpt_path), map_location="cpu")
     size = int(ck.get("size", 224))
-    model = OwnDepthPose(base=int(ck.get("base", 32)), max_depth=float(ck.get("max_depth", 10.0)))
+    # backbone comes from the checkpoint; pretrained=False since the ImageNet weights are already baked into it
+    model = OwnDepthPose(base=int(ck.get("base", 32)), max_depth=float(ck.get("max_depth", 10.0)),
+                         backbone=str(ck.get("backbone", "scratch")), pretrained=False)
     model.load_state_dict(ck["model"])
     model = model.to(device).eval()
     K = geom.intrinsics_from_fov(size, size, 60.0)  # own model is intrinsics-free; a fixed FoV colours the cloud

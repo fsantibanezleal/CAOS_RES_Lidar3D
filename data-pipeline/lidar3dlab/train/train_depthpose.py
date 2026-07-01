@@ -124,6 +124,16 @@ def evaluate(model: OwnDepthPose, seq_dir: str, device: torch.device, size: int,
     return umeyama_ate(pred_c[:n], gt_c[:n])
 
 
+def _log_experiment(out_dir: Path, rec: dict) -> None:
+    """Append one training epoch's result to models/own-depthpose/experiments.jsonl so the full history of every
+    model/experiment is preserved (fed into docs/experiments + the web Experiments page). Never truncates."""
+    import datetime
+    import json
+    rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"), **rec}
+    with open(out_dir / "experiments.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--epochs", type=int, default=2)
@@ -135,6 +145,8 @@ def main() -> None:
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
+    ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
+                    help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -153,7 +165,7 @@ def main() -> None:
     train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
-    model = OwnDepthPose(base=args.base, max_depth=10.0).to(device)
+    model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
@@ -196,10 +208,18 @@ def main() -> None:
         ate = evaluate(model, val_seq, device, args.size, max_pairs=300)
         improved = ate < best_ate
         print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
+        n_params = sum(p.numel() for p in model.parameters())
+        _log_experiment(out_dir, {                     # append every epoch so NO experiment is ever lost
+            "backbone": args.backbone, "epoch": ep, "val_ate": round(ate, 4), "best_ate": round(min(ate, best_ate), 4),
+            "is_best": improved, "params_M": round(n_params / 1e6, 3), "base": args.base, "size": args.size,
+            "lr": args.lr, "use_icl": args.use_icl, "train_pairs": len(train), "val_seq": os.path.basename(val_seq),
+        })
         if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
             best_ate = ate
-            torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base, "val_ate": ate},
-                       out_dir / "own-depthpose.pt")
+            ckpt = {"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base,
+                    "backbone": args.backbone, "val_ate": ate}
+            torch.save(ckpt, out_dir / f"own-depthpose-{args.backbone}.pt")   # per-backbone archive (never clobbered)
+            torch.save(ckpt, out_dir / "own-depthpose.pt")                    # canonical file the engine loads
 
     if args.smoke:
         print("SMOKE OK")
