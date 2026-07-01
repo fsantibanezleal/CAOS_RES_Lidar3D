@@ -3,6 +3,14 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.004] · 2026-07-01
+
+### Fixed (our model quality)
+- The training now keeps the BEST checkpoint by val ATE (early stopping): a prior long run had overfit and
+  degraded the saved model to 0.49 m (the "diffuse" reconstruction). Retrained -> 0.29 m held-out ATE; the OUR
+  case is re-baked with it (coherent per-frame depth, more structure). More datasets are now available
+  (ICL-NUIM, 7-Scenes, TUM RGB-D) to push it further.
+
 ## [0.09.003] · 2026-07-01
 
 ### Added (dataset + license transparency, to avoid licensing issues)
