@@ -180,6 +180,8 @@ def main() -> None:
     best_ate = float("inf")
     out_dir = Path(os.environ.get("LIDAR3D_MODELS_ROOT", "models")) / "own-depthpose"
     out_dir.mkdir(parents=True, exist_ok=True)
+    import datetime as _dt
+    run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")   # unique per run so a run NEVER clobbers another's best
     for ep in range(1 if args.smoke else args.epochs):
         model.train()
         for b in dl:
@@ -225,7 +227,7 @@ def main() -> None:
             ckpt = {"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base,
                     "backbone": args.backbone, "pose_head": args.pose_head, "val_ate": ate}
             tag = f"{args.backbone}-{args.pose_head}" if args.pose_head != "siamese" else args.backbone
-            torch.save(ckpt, out_dir / f"own-depthpose-{tag}.pt")             # per-variant archive (never clobbered)
+            torch.save(ckpt, out_dir / f"own-depthpose-{tag}-{run_id}.pt")    # UNIQUE per-run archive (never clobbered)
             torch.save(ckpt, out_dir / "own-depthpose.pt")                    # canonical file the engine loads
             import json as _json
             (out_dir / "own-depthpose.meta.json").write_text(_json.dumps({    # small sidecar for accurate engine labels

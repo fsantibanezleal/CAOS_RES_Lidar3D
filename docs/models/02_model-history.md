@@ -18,6 +18,26 @@ household` sequence (~300 pairs), aligned with Umeyama; lower is better. The mac
 | M6 | simple retrain + conf 0.6 | scratch (base 32) | TUM RGB-D | **0.4344 m** | no (reverted) | run-to-run instability landed worse than M4; re-baked OUR case with `conf_quantile=0.6` (54,665 pts, down from 128k), but 0.43 m pose was still diffuse, so the re-bake was reverted to keep M4 (0.29 m) live. Note: this run overwrote the M4 *checkpoint*; M4's *baked artifact* is preserved in git |
 | M7 | **pretrained backbone + ICP** (v0.11.000) | **resnet18** (12.8 M) | TUM RGB-D **+ ICL-NUIM** (perfect GT depth), 7329 pairs | **0.37 m** (best over 10 epochs; epoch 4) | **yes (LIVE)** | ImageNet ResNet-18 shared by depth decoder + Siamese pose head; pose loss ~0.0015 (much steadier than scratch). Inference adds real per-dataset intrinsics + far-depth clamp + frame-to-frame point-to-plane **ICP** pose refinement (Open3D, model pose init) to remove accumulated drift. Deployed across **8 OWN scenes at 240 frames** (TUM x5 + 7-Scenes x2 + ICL); parallel visual review verified all recognizable. Per-frame depth is excellent; the fused cloud is an honest feed-forward result. Note: the val-ATE (0.37 m on the 300-frame long-office eval) is worse than M4's 0.29 m by the trajectory metric, but M7's sharper depth + ICP-refined pose give a better *reconstruction*; M4's checkpoint was lost (only its baked artifact remained), so M7 is the deployed model everywhere |
 
+## Refinement + pose-head experiments (v0.12.x)
+
+| # | Run | Change | Result | Kept? |
+|---|---|---|---|---|
+| R1 | ICP refinement | frame-to-frame point-to-plane ICP on the model poses | tighter local trajectory, recognizable clouds | **yes (default)** |
+| R2 | D1 global pose-graph + loop closure | Open3D multiway odometry + loop-closure edges + global optimization | over-constrains single-area indoor sweeps at ~0.37 m pose accuracy (241 loop edges on desk); tight trajectory but not cleaner cloud | implemented, **opt-in** |
+| R3 | TSDF volumetric fusion | KinectFusion-style denoised surface | fuses SPARSELY at ~0.37 m pose accuracy (frames disagree, desk fell to 4.6k pts); needs sub-voxel poses | implemented, **opt-in** |
+| R4 | **Correlation pose head** | RAFT/TartanVO-style local cost volume replacing the Siamese pooled-feature head | **NEGATIVE**: per-pair pose loss dropped (0.0008) but held-out ATE got WORSE (0.63 -> 0.80 m over epochs) — good local pose, worse accumulation. Not deployed | archived, not default |
+| R5 | more data (TUM 5 -> 11 seq) | retrain the Siamese head on ~16k pairs (was ~7k) + ICL | in progress (recovers/improves the model; the honest more-data lever on the proven architecture) | pending |
+
+**Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
+checkpoint with a killed-early run's worse checkpoint (0.77 m). The *deployed* artifacts (v0.11.000) are safe (baked +
+committed), but the 0.37 m weights were lost. Fixed for good: every run now writes a **unique timestamped archive**
+(`own-depthpose-<variant>-<runid>.pt`), so no run can ever clobber another's best again.
+
+**The honest conclusion (v0.12.x).** A clean fused surface is bounded by pose accuracy, not by post-processing. ICP,
+D1 and TSDF are all implemented; D1/TSDF become the default once the pose model crosses sub-voxel accuracy. The
+correlation pose head did not help. The remaining lever being pursued is more/broader training data on the proven
+Siamese head, then (future) a pose head that regresses to the *accumulated* trajectory, not just per-pair.
+
 ## Reading the appearance vs the number
 
 The "diffuse cloud" complaint is dominated by **pose drift**, not depth noise: the per-frame depth of the from-
