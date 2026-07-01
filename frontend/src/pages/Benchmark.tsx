@@ -1,6 +1,6 @@
 import { type Lang } from '../i18n';
 import { SubTabs } from '../components/SubTabs';
-import { Cite, References } from '../components/References';
+import { Cite, Refs } from '../components/References';
 
 export function Benchmark({ lang }: { lang: Lang }) {
   const en = lang === 'en';
@@ -86,13 +86,11 @@ export function Benchmark({ lang }: { lang: Lang }) {
         ? 'Results for the different models employed: the classical baselines, the SOTA engine reported numbers, and this lab measured numbers, kept separate and honestly labelled.'
         : 'Resultados para los distintos modelos empleados: las líneas base clásicas, los números reportados del motor SOTA y los números medidos por este lab, separados y etiquetados honestamente.'}</p>
       <SubTabs tabs={[
-        { id: 'ladder', label: en ? 'Model ladder' : 'Escalera de modelos', body: ladder },
-        { id: 'sota', label: en ? 'Camera SOTA' : 'SOTA cámara', body: cameraSota },
-        { id: 'measured', label: en ? 'Measured (this lab)' : 'Medido (este lab)', body: measured },
+        { id: 'ladder', label: en ? 'Model ladder' : 'Escalera de modelos', body: <>{ladder}<Refs ids={['open3d', 'kissicp', 'lingbot']} /></> },
+        { id: 'sota', label: en ? 'Camera SOTA' : 'SOTA cámara', body: <>{cameraSota}<Refs ids={['lingbot', 'cut3r', 'vggt', 'oxfordspires']} /></> },
+        { id: 'measured', label: en ? 'Measured (this lab)' : 'Medido (este lab)', body: <>{measured}<Refs ids={['tum', 'flashinfer']} /></> },
         { id: 'honesty', label: en ? 'Honesty' : 'Honestidad', body: honesty },
       ]} />
-      <h3>{en ? 'References' : 'Referencias'}</h3>
-      <References only={['lingbot', 'cut3r', 'vggt', 'oxfordspires', 'kissicp', 'open3d', 'kitti']} />
     </div>
   );
 }

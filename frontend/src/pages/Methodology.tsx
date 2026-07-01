@@ -2,7 +2,7 @@ import { type Lang } from '../i18n';
 import { Katex } from '../components/Katex';
 import { SubTabs } from '../components/SubTabs';
 import { ContextDiagram, GCTDiagram } from '../components/Diagrams';
-import { Cite, References } from '../components/References';
+import { Cite, Refs } from '../components/References';
 
 export function Methodology({ lang }: { lang: Lang }) {
   const en = lang === 'en';
@@ -85,13 +85,11 @@ export function Methodology({ lang }: { lang: Lang }) {
         ? 'The camera engine is the Geometric Context Transformer (GCT): a frozen-DINOv2 ViT with 24 alternating frame / cross-frame attention blocks, driven causally with a three-tier context and a paged KV cache. This page covers the state of the art, the networks, the attention context, and the geometry.'
         : 'El motor de cámara es el Geometric Context Transformer (GCT): un ViT con DINOv2 congelado y 24 bloques alternados de atención por-cuadro / entre-cuadros, ejecutado causalmente con un contexto de tres niveles y un KV cache paginado. Esta página cubre el estado del arte, las redes, el contexto de atención y la geometría.'}</p>
       <SubTabs tabs={[
-        { id: 'sota', label: en ? 'State of the art' : 'Estado del arte', body: sota },
-        { id: 'net', label: en ? 'Networks' : 'Redes', body: networks },
-        { id: 'ctx', label: en ? 'Geometric Context' : 'Contexto Geométrico', body: context },
-        { id: 'geo', label: en ? 'Geometry' : 'Geometría', body: geometry },
+        { id: 'sota', label: en ? 'State of the art' : 'Estado del arte', body: <>{sota}<Refs ids={['dust3r', 'mast3r', 'vggt', 'lingbot', 'spann3r', 'cut3r', 'orbslam3', 'droid', 'kissicp']} /></> },
+        { id: 'net', label: en ? 'Networks' : 'Redes', body: <>{networks}<Refs ids={['dinov2', 'dinov3', 'vggt', 'lingbot']} /></> },
+        { id: 'ctx', label: en ? 'Geometric Context' : 'Contexto Geométrico', body: <>{context}<Refs ids={['lingbot', 'rope', 'flashinfer', 'vggt']} /></> },
+        { id: 'geo', label: en ? 'Geometry' : 'Geometría', body: <>{geometry}<Refs ids={['lingbot', 'kissicp', 'open3d']} /></> },
       ]} />
-      <h3>{en ? 'References' : 'Referencias'}</h3>
-      <References only={['lingbot', 'dust3r', 'mast3r', 'vggt', 'dinov2', 'dinov3', 'spann3r', 'cut3r', 'orbslam3', 'droid', 'kissicp', 'open3d', 'loam', 'rope', 'flashinfer']} />
     </div>
   );
 }

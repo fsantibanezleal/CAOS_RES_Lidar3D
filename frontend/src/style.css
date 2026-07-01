@@ -57,6 +57,9 @@ main.app { flex: 1; }
 .reflist { color: var(--mut); font-size: 13px; line-height: 1.7; padding-left: 24px; }
 .reflist li { margin: 3px 0; }
 .reflist a { color: var(--acc2); }
+.refs-inline { color: var(--mut); font-size: 12px; margin: 12px 0 4px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.refs-inline a { color: var(--acc2); }
+.refs-lbl { color: var(--acc); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; font-size: 11px; margin-right: 4px; }
 .muted { color: var(--mut); }
 .cite { color: var(--acc2); font-size: 0.72em; font-weight: 600; padding-left: 1px; }
 

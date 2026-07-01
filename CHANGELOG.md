@@ -3,6 +3,31 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.06.000] · 2026-07-01
+
+### Added (OUR own trainable model + model-agnostic engine + a real training surface)
+- **model-agnostic engine registry** (`model/agnostic.py`): every reconstructor runs behind one contract
+  (control / classical / SOTA-reference / OURS); the App selects the model, the pipeline honors `spec.engine`
+  end-to-end (fixed a bug where CONTRACT 1 dropped it, so every case silently ran the vendored SOTA).
+- **OUR own from-scratch depth+pose model** (`model/nets/own_depthpose.py`, 2.2M params: UNet metric depth +
+  learned aleatoric confidence + PoseNet with our own se(3) exp), **trained on the GPU** on real TUM RGB-D
+  (`train/`), ~0.2 m held-out ATE; served behind the agnostic contract (`model/own_engine.py`). Not vendored.
+- **OUR own geometry** (`model/geom.py`), unit-tested against a ground-truth cube so the "reconstruction built
+  behind the camera" bug is provably impossible.
+- Downloaded 5 TUM RGB-D sequences (~9.9k RGB-D frames + GT) to the scratch volume for training/exploration.
+
+### Added (App viewer + per-frame panel)
+- Camera modes: orbit / first-person (follows the player) / top. `logarithmicDepthBuffer` + scene-scaled
+  near/far so points DO NOT vanish when zooming to point level.
+- Per-frame Depth (+ RGB when the engine emits it) view that FOLLOWS the player (no separate slider); stats
+  moved to the right panel.
+
+### Fixed (ADR compliance)
+- References are now per-section `<Refs>` with inline linked `<Cite>` (ADR-0017 §4); removed the banned
+  bottom-of-page bibliography dump.
+- The architecture button is the ⓘ icon only; layout no longer overflows below the footer; synthetic camera
+  moves into what it images (was translating backward).
+
 ## [0.05.000] · 2026-06-30
 
 ### Added (ADR compliance + deep content: header/footer/modal + tabbed pages)
