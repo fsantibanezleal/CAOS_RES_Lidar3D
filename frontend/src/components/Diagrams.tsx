@@ -114,6 +114,84 @@ export function GCTDiagram({ lang }: { lang: Lang }) {
   );
 }
 
+// ---- The app + the design/build lifecycle -----------------------------------------------------------------
+export function DesignFlowDiagram({ lang }: { lang: Lang }) {
+  const en = lang === 'en';
+  const steps: [string, string][] = [
+    [en ? 'research / fiche' : 'research / ficha', 'wip/lidar3d + surveys'],
+    [en ? 'implement' : 'implementar', 'data-pipeline/lidar3dlab'],
+    [en ? 'train + validate' : 'entrenar + validar', 'train/ · geom test · ATE'],
+    [en ? 'bake artifact' : 'hornear artefacto', 'stages/export · trace.json'],
+    [en ? 'build SPA' : 'build SPA', 'frontend/ · copy-data'],
+    [en ? 'deploy' : 'desplegar', 'Pages · fasl-work.com'],
+  ];
+  return (
+    <Frame h={230} vb="0 0 720 230">
+      <><Defs />
+        <text x={16} y={22} fontSize="12.5" fontWeight="700" fill={C.txt}>{en ? 'Lidar 3D: what it is + how it was designed and built' : 'Lidar 3D: qué es + cómo se diseñó y construyó'}</text>
+        <Box x={16} y={40} w={688} h={40} title={en ? 'A streaming 3D reconstruction lab: video/LiDAR to poses + metric depth + a colored world cloud' : 'Un lab de reconstrucción 3D en streaming: video/LiDAR a poses + profundidad métrica + nube de mundo coloreada'} accent={C.acc2} />
+        {steps.map(([t, s], i) => {
+          const x = 16 + i * 116;
+          return <g key={i}><Box x={x} y={110} w={104} h={54} title={t} sub={s} accent={i === 2 ? C.acc : undefined} />
+            {i < steps.length - 1 && <Arrow x1={x + 104} y1={137} x2={x + 116} y2={137} accent />}</g>;
+        })}
+        <text x={360} y={196} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'the design-build flow (research to deploy); the App you see is the replay of a committed artifact' : 'el flujo de diseño-construcción (research a deploy); la App que ves es el replay de un artefacto commiteado'}</text>
+      </>
+    </Frame>
+  );
+}
+
+// ---- The web-app (SPA) flow --------------------------------------------------------------------------------
+export function WebAppFlowDiagram({ lang }: { lang: Lang }) {
+  const en = lang === 'en';
+  return (
+    <Frame h={280} vb="0 0 720 280">
+      <><Defs />
+        <Box x={16} y={40} w={150} h={54} title="committed artifacts" sub="data/derived/*/trace.json" accent={C.acc} />
+        <Arrow x1={166} y1={67} x2={186} y2={67} accent />
+        <Box x={186} y={40} w={140} h={54} title="copy-data.mjs" sub={en ? 'overlay -> public/data' : 'overlay -> public/data'} />
+        <Arrow x1={326} y1={67} x2={346} y2={67} />
+        <Box x={346} y={40} w={150} h={54} title="api/artifacts.ts" sub="fetch + b64 -> typed arrays" accent={C.acc2} />
+        <Arrow x1={496} y1={67} x2={516} y2={67} />
+        <Box x={516} y={40} w={188} h={54} title="contract.types.ts" sub={en ? 'MIRROR (drift fails tsc build)' : 'ESPEJO (un drift rompe tsc)'} accent={C.warn} />
+
+        <Box x={16} y={140} w={210} h={60} title="AppPage (workbench)" sub={en ? 'case selector + replay + controls' : 'selector de caso + replay + controles'} accent={C.acc2} />
+        <Arrow x1={226} y1={170} x2={246} y2={170} />
+        <Box x={246} y={140} w={230} h={60} title={en ? 'renderer: three.js | deck.gl' : 'renderer: three.js | deck.gl'} sub={en ? 'point cloud + trajectory + camera modes' : 'nube + trayectoria + modos de cámara'} accent={C.acc} />
+        <Arrow x1={476} y1={170} x2={496} y2={170} />
+        <Box x={496} y={140} w={208} h={60} title={en ? '6 pages (ADR-0016)' : '6 páginas (ADR-0016)'} sub={en ? 'App + 5 deep tabbed texts + ⓘ modal' : 'App + 5 textos tabulados + modal ⓘ'} />
+        <path d="M120 94 V140" stroke={C.acc} strokeWidth="1.5" markerEnd="url(#ahA)" />
+        <text x={360} y={238} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'static SPA: it only replays committed artifacts, it never recomputes in the browser' : 'SPA estática: solo reproduce artefactos commiteados, nunca recomputa en el browser'}</text>
+      </>
+    </Frame>
+  );
+}
+
+// ---- The two data contracts + the design ------------------------------------------------------------------
+export function DataContractsDiagram({ lang }: { lang: Lang }) {
+  const en = lang === 'en';
+  return (
+    <Frame h={280} vb="0 0 720 280">
+      <><Defs />
+        <Lane x={8} y={26} w={340} h={230} label={en ? 'CONTRACT 1 · ingestion (bring-your-own-data)' : 'CONTRATO 1 · ingesta (trae-tus-datos)'} color={C.acc2} />
+        <Lane x={360} y={26} w={352} h={230} label={en ? 'CONTRACT 2 · artifact (pipeline to web)' : 'CONTRATO 2 · artefacto (pipeline a web)'} color={C.acc} />
+        <Box x={28} y={54} w={300} h={40} title={en ? 'RGB / LiDAR sequence + knobs' : 'Secuencia RGB / LiDAR + knobs'} sub="io/schema.py SequenceSpec" />
+        <Arrow x1={178} y1={94} x2={178} y2={110} />
+        <Box x={28} y={112} w={300} h={44} title="validate_rows (io/contract.py)" sub={en ? 'accept · reject-with-reason · flag' : 'aceptar · rechazar-con-razón · marcar'} accent={C.acc2} />
+        <Arrow x1={178} y1={156} x2={178} y2={172} />
+        <Box x={28} y={174} w={300} h={44} title={en ? 'outlier policy (explicit)' : 'política de outliers (explícita)'} sub={en ? 'never silently coerced' : 'nunca coaccionado en silencio'} />
+
+        <Box x={380} y={54} w={312} h={44} title="trace.json (core/trace.py)" sub={en ? 'b64 cloud + poses + depth/RGB thumbs' : 'nube b64 + poses + thumbs depth/RGB'} accent={C.acc} />
+        <Arrow x1={536} y1={98} x2={536} y2={114} accent />
+        <Box x={380} y={116} w={312} h={44} title="manifest.json (core/manifest.py)" sub={en ? 'params · seed · lane/gate verdict · bytes' : 'params · seed · veredicto lane/gate · bytes'} accent={C.acc} />
+        <Arrow x1={536} y1={160} x2={536} y2={176} accent />
+        <Box x={380} y={178} w={312} h={44} title="contract.types.ts" sub={en ? 'TypeScript MIRROR: a drift fails the build' : 'ESPEJO TypeScript: un drift rompe el build'} accent={C.warn} />
+        <path d={`M328 134 H360`} stroke={C.mut} strokeWidth="1.5" markerEnd="url(#ah)" />
+      </>
+    </Frame>
+  );
+}
+
 // ---- 3) The three-tier attention context ------------------------------------------------------------------
 export function ContextDiagram({ lang }: { lang: Lang }) {
   const en = lang === 'en';

@@ -3,6 +3,14 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.08.000] · 2026-07-01
+
+### Added (ADR-0058: the 5-tab architecture modal)
+- The ⓘ "How it works" modal is now a **tab strip of 5 themed SVG diagrams** (the app + design-build flow /
+  lanes web-offline-compute / web-app flow / the science / data contracts), each with a bilingual explanation,
+  Esc-to-close and `role="dialog"`. New `DesignFlowDiagram`, `WebAppFlowDiagram`, `DataContractsDiagram` (real
+  module/file names, structured lanes, labeled flows, all theme-variable colors, zero hardcoded hex).
+
 ## [0.07.000] · 2026-07-01
 
 ### Added (scalable viewer: deck.gl, selectable)
