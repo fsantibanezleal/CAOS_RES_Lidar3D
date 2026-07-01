@@ -156,8 +156,10 @@ def main() -> None:
     seqs = list_sequences()
     if not seqs:
         raise SystemExit("no TUM sequences under LIDAR3D_DATA_ROOT/train/tum-rgbd (download them first)")
-    val_seq = seqs[-1]
-    train_seqs = seqs[:-1] or seqs
+    # pin the held-out sequence to long_office when present (keeps OWN_tum_office truly held-out + ATE comparable
+    # across runs); otherwise fall back to the last sequence.
+    val_seq = next((s for s in seqs if "long_office" in s), seqs[-1])
+    train_seqs = [s for s in seqs if s != val_seq] or seqs
     mp = args.max_pairs if not args.smoke else 4
     datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
     if args.use_icl:
