@@ -24,24 +24,24 @@ class Case:
     real_or_synthetic: str
 
 
-def _real(seq: str, max_frames: int = 48) -> SequenceSpec:
+def _real(seq: str, max_frames: int = 96) -> SequenceSpec:
     return SequenceSpec(case_id=seq, source_dir=str(sequence_dir(seq)), n_frames=0, max_frames=max_frames)
 
 
 CASES: list[Case] = [
     Case("SYN_orbit", "synthetic: camera, procedural corridor (CPU, CI)",
-         SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=40, max_frames=40,
+         SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=120, max_frames=120,
                       decimation=4, synthetic=True),
          "forward tunnel; colored/textured walls; ~5 m path; runs on CPU in <1 s", "synthetic"),
     Case("LID_synthetic", "synthetic: LiDAR ICP odometry (CPU, CI)",
-         SequenceSpec("LID_synthetic", source_dir="synthetic://lidar", n_frames=30, max_frames=30,
+         SequenceSpec("LID_synthetic", source_dir="synthetic://lidar", n_frames=90, max_frames=90,
                       synthetic=True, modality="lidar"),
          "forward LiDAR sweep down a corridor; point-to-plane ICP odometry recovers a ~9 m path; height-colored map",
          "synthetic"),
     Case("OWN_tum_desk", "ours: trained depth+pose model (TUM RGB-D)",
          SequenceSpec("OWN_tum_desk",
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk" / "rgb"),
-                      n_frames=0, max_frames=60, decimation=2, engine="own-depthpose"),
+                      n_frames=0, max_frames=120, decimation=2, engine="own-depthpose"),
          "OUR from-scratch depth+pose model (trained on TUM RGB-D, ~0.2 m held-out ATE) reconstructs a desk sweep",
          "real"),
     Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",

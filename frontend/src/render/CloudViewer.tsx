@@ -23,12 +23,12 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const data = useRef<{ pts: Float32Array; offsets: number[]; nFrames: number } | null>(null);
+  const caseRef = useRef(''); // to re-fit the camera only on a NEW case, not on density/color changes
 
   useEffect(() => {
     const mount = mountRef.current!;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, 1, 0.001, 5000);
-    camera.up.set(0, -1, 0);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.001, 5000); // default +Y up; data is flipped to render frame
     // logarithmicDepthBuffer: a point cloud spans a wide depth range; a naive near/far destroys depth precision
     // and points VANISH when you zoom in close. This keeps them visible down to point level. preserveDrawingBuffer
     // keeps a settled static frame painted.
@@ -40,6 +40,8 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     controls.zoomToCursor = true; // zoom toward what you point at, so you can dive into a detail
     const cloud = new THREE.Points(new THREE.BufferGeometry(),
       new THREE.PointsMaterial({ size: pointSize, vertexColors: true, sizeAttenuation: true }));
+    cloud.frustumCulled = false; // do NOT cull the whole cloud when the camera moves inside it (the "points
+    // vanish when you zoom in" bug: three.js was culling the entire Points object by its bounding sphere).
     scene.add(cloud);
     const traj = new THREE.Group(); scene.add(traj);
     const grid = new THREE.GridHelper(20, 20, 0x274060, 0x18243c); grid.rotation.x = Math.PI / 2; scene.add(grid);
@@ -74,8 +76,10 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const stride = Math.max(1, Math.round(density));
     const n = Math.ceil(nAll / stride);
     const pts = new Float32Array(n * 3), cols = new Uint8Array(n * 3);
+    // OpenCV world (X-right, Y-down, Z-forward) -> render frame (Y-up): (x,y,z)->(x,-y,-z). Handedness-preserving
+    // (a 180 deg rotation about X, det=+1), so NO mirror. The SAME transform is applied in DeckViewer.
     for (let i = 0, j = 0; i < nAll; i += stride, j++) {
-      pts[j * 3] = pAll[i * 3]; pts[j * 3 + 1] = pAll[i * 3 + 1]; pts[j * 3 + 2] = pAll[i * 3 + 2];
+      pts[j * 3] = pAll[i * 3]; pts[j * 3 + 1] = -pAll[i * 3 + 1]; pts[j * 3 + 2] = -pAll[i * 3 + 2];
       cols[j * 3] = cAll[i * 3]; cols[j * 3 + 1] = cAll[i * 3 + 1]; cols[j * 3 + 2] = cAll[i * 3 + 2];
     }
     if (colorMode === 'depth') {
@@ -94,21 +98,29 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
 
     a.traj.clear();
     const poses = b64ToF32(trace.poses_b64); const S = (poses.length / 12) | 0;
+    // frustum size scales with the scene so the "camera cone" is visible at any scale (a fixed 0.05 looked like
+    // a dot/line in a 19 m LiDAR corridor). Also scale by the mean inter-camera step so cones don't overlap.
+    const diag = g.boundingBox ? g.boundingBox.getSize(new THREE.Vector3()).length() : 1;
+    const s = Math.max(diag * 0.018, 0.03), d = s * 2.0;
+    const fp = [[0,0,0],[s,s,d],[0,0,0],[s,-s,d],[0,0,0],[-s,s,d],[0,0,0],[-s,-s,d],[s,s,d],[s,-s,d],[s,-s,d],[-s,-s,d],[-s,-s,d],[-s,s,d],[-s,s,d],[s,s,d]];
+    const FLIP = new THREE.Matrix4().makeScale(1, -1, -1); // OpenCV world -> render frame, applied AFTER the pose
     a.frustums = []; const centers: THREE.Vector3[] = []; const fwds: THREE.Vector3[] = [];
     for (let i = 0; i < S; i++) {
       const p = poses.subarray(i * 12, i * 12 + 12);
       const m = new THREE.Matrix4().set(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], 0, 0, 0, 1);
-      centers.push(new THREE.Vector3(p[3], p[7], p[11]));
-      fwds.push(new THREE.Vector3(p[2], p[6], p[10]).normalize()); // camera +Z (forward) in world
-      const s = 0.05, d = 0.09; const fp = [[0,0,0],[s,s,d],[0,0,0],[s,-s,d],[0,0,0],[-s,s,d],[0,0,0],[-s,-s,d],[s,s,d],[s,-s,d],[s,-s,d],[-s,-s,d],[-s,-s,d],[-s,s,d],[-s,s,d],[s,s,d]];
-      const fg = new THREE.BufferGeometry().setFromPoints(fp.map((q) => new THREE.Vector3(q[0], q[1], q[2]))); fg.applyMatrix4(m);
-      const ls = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ color: 0x33d6a6 })); a.traj.add(ls); a.frustums.push(ls);
+      centers.push(new THREE.Vector3(p[3], -p[7], -p[11]));                     // center in render frame
+      fwds.push(new THREE.Vector3(p[2], -p[6], -p[10]).normalize());            // forward in render frame
+      const fg = new THREE.BufferGeometry().setFromPoints(fp.map((q) => new THREE.Vector3(q[0], q[1], q[2])));
+      fg.applyMatrix4(m); fg.applyMatrix4(FLIP);                                // pose then OpenCV->render flip
+      const ls = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ color: 0x33d6a6 })); ls.frustumCulled = false; a.traj.add(ls); a.frustums.push(ls);
     }
     const tg = new THREE.BufferGeometry().setFromPoints(centers);
-    a.trajLine = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xff5252 })); a.traj.add(a.trajLine);
+    a.trajLine = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xff5252 })); a.trajLine.frustumCulled = false; a.traj.add(a.trajLine);
     a.centers = centers; a.fwds = fwds; a.bbox = g.boundingBox;
 
-    positionCamera(true);
+    const isNewCase = caseRef.current !== trace.case_id; // preserve the user's view on density/color changes
+    caseRef.current = trace.case_id;
+    positionCamera(isNewCase);
     applyReveal(); a.resize();
     requestAnimationFrame(() => { a.resize(); requestAnimationFrame(() => a.resize()); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,16 +134,16 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const frame = d ? Math.min(a.centers.length - 1, Math.round(Math.max(0, Math.min(1, reveal)) * (a.centers.length - 1))) : 0;
     if (cameraMode === 'first') {
       const pos = a.centers[frame].clone(); const fwd = a.fwds[frame] || new THREE.Vector3(0, 0, 1);
-      a.camera.position.copy(pos.clone().addScaledVector(fwd, -0.25)); // just behind the camera center
-      a.controls.target.copy(pos.clone().addScaledVector(fwd, 2.0));   // look forward along the path
+      a.controls.target.copy(pos);                                    // CENTER on the last measured point
+      a.camera.position.copy(pos.clone().addScaledVector(fwd, -r * 0.28)); // just behind the sensor, looking at it
       a.controls.minDistance = 0.01; a.controls.maxDistance = r * 6;
     } else if (cameraMode === 'top') {
       a.controls.target.copy(c);
-      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.001, -r * 2.4, 0.001))); // above (up = -Y)
+      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.001, r * 2.4, 0.001))); // above (+Y up)
       a.controls.minDistance = r * 0.2; a.controls.maxDistance = r * 8;
     } else if (fit) { // orbit, only re-fit on load / switch (don't yank the user's view every frame)
       a.controls.target.copy(c);
-      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.4, -0.5, -1).normalize().multiplyScalar(r * 2.2)));
+      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.5, 0.45, 1).normalize().multiplyScalar(r * 2.2)));
       a.controls.minDistance = r * 0.05; a.controls.maxDistance = r * 10;
     }
     a.controls.update(); a.render();

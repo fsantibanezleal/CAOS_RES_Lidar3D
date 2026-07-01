@@ -3,6 +3,23 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.001] · 2026-07-01
+
+### Fixed (viewer transforms + per-frame panel + longer scenes; reviewed in detail)
+- **Coordinate convention unified**: one OpenCV->render transform (x,y,z)->(x,-y,-z) (handedness-preserving, no
+  mirror) applied identically in three.js AND deck.gl; removed the per-viewer up/negate hacks that made one look
+  horizontally and the other vertically inverted.
+- **LiDAR poses were scrambled** (det(R)=0, zero forward): serialized [R|t] as P[:3,:4], so the observer frustums
+  now render with the right orientation (they were an invisible line before).
+- **Observer frustums scale with the scene** (a fixed size was a dot in a long corridor); frustumCulled=false so
+  points/cones do not vanish when zooming inside the cloud.
+- **Per-frame panel = Depth / RGB tabs** (Depth default, always present incl. LiDAR range images; RGB when the
+  engine emits it). First-person camera centers on the last measured point. Camera view is preserved on
+  density/color changes (re-fit only on a new case or camera-mode switch).
+- **Longer scenes**: raised max_frames (SYN 120, LiDAR 90, OUR 120, real 96) with ~48-keyframe thumb sampling.
+- Training: keep the BEST checkpoint by val ATE (early stopping; a 12-epoch run had overfit and degraded it) +
+  an optional self-supervised photometric reprojection loss (--photo_w).
+
 ## [0.09.000] · 2026-07-01
 
 ### Changed (lift the point cap)

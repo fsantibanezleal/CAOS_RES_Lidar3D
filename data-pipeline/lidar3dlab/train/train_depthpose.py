@@ -37,6 +37,46 @@ def pose_loss(pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
     return r + t
 
 
+def _ssim(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Lightweight SSIM (3x3 avg-pool windows) -> per-pixel structural dissimilarity in [0,1]."""
+    pool = torch.nn.functional.avg_pool2d
+    mu_a, mu_b = pool(a, 3, 1, 1), pool(b, 3, 1, 1)
+    va = pool(a * a, 3, 1, 1) - mu_a * mu_a
+    vb = pool(b * b, 3, 1, 1) - mu_b * mu_b
+    vab = pool(a * b, 3, 1, 1) - mu_a * mu_b
+    c1, c2 = 0.01 ** 2, 0.03 ** 2
+    ssim = ((2 * mu_a * mu_b + c1) * (2 * vab + c2)) / ((mu_a ** 2 + mu_b ** 2 + c1) * (va + vb + c2))
+    return ((1 - ssim) / 2).clamp(0, 1)
+
+
+def photometric_loss(rgb0: torch.Tensor, rgb1: torch.Tensor, depth0: torch.Tensor,
+                     rel_pose: torch.Tensor, K: torch.Tensor) -> torch.Tensor:
+    """Self-supervised reprojection: warp rgb1 into frame-0 using the PREDICTED depth0 + relative pose, and
+    penalize the photometric mismatch (SSIM + L1). rel_pose maps cam1->cam0 (frame t+1 in frame t), so cam0->cam1
+    is its inverse. Gradients flow to both depth and pose. Auto-masks invalid/behind-camera pixels."""
+    B, _, H, W = rgb0.shape
+    dev = rgb0.device
+    vv, uu = torch.meshgrid(torch.arange(H, device=dev), torch.arange(W, device=dev), indexing="ij")
+    pix = torch.stack([uu.float(), vv.float(), torch.ones_like(uu, dtype=torch.float32)], 0).reshape(3, -1)  # [3,HW]
+    Kinv = torch.inverse(K.float())                                   # [B,3,3]
+    cam0 = (Kinv @ pix).reshape(B, 3, H, W) * depth0                  # [B,3,H,W] back-projected to cam0
+    inv = torch.inverse(rel_pose.float())                            # cam0 -> cam1
+    R, t = inv[:, :3, :3], inv[:, :3, 3:4]
+    cam1 = (R @ cam0.reshape(B, 3, -1) + t).reshape(B, 3, H, W)       # [B,3,H,W] in cam1
+    z = cam1[:, 2:3].clamp(min=1e-3)
+    proj = (K.float() @ (cam1.reshape(B, 3, -1) / z.reshape(B, 1, -1))).reshape(B, 3, H, W)
+    gx = 2 * proj[:, 0] / (W - 1) - 1
+    gy = 2 * proj[:, 1] / (H - 1) - 1
+    grid = torch.stack([gx, gy], -1)                                 # [B,H,W,2]
+    warped = torch.nn.functional.grid_sample(rgb1, grid, align_corners=True, padding_mode="border")
+    valid = (cam1[:, 2:3] > 1e-3) & (gx.abs() <= 1).unsqueeze(1) & (gy.abs() <= 1).unsqueeze(1) & (depth0 > 0.1)
+    l1 = (warped - rgb0).abs().mean(1, keepdim=True)
+    ssim = _ssim(warped, rgb0).mean(1, keepdim=True)
+    per = 0.15 * l1 + 0.85 * ssim
+    v = valid.float()
+    return (per * v).sum() / v.sum().clamp(min=1.0)
+
+
 def umeyama_ate(pred_c: np.ndarray, gt_c: np.ndarray) -> float:
     """RMS ATE after a rigid (R,t) alignment of the predicted trajectory to the GT (no scale)."""
     mp, mg = pred_c.mean(0), gt_c.mean(0)
@@ -79,6 +119,7 @@ def main() -> None:
     ap.add_argument("--size", type=int, default=224)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--max_pairs", type=int, default=None, help="cap pairs per sequence (smoke test)")
+    ap.add_argument("--photo_w", type=float, default=0.0, help="self-supervised photometric loss weight (0=off)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -100,6 +141,9 @@ def main() -> None:
           f"params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
     steps = 0
+    best_ate = float("inf")
+    out_dir = Path(os.environ.get("LIDAR3D_MODELS_ROOT", "models")) / "own-depthpose"
+    out_dir.mkdir(parents=True, exist_ok=True)
     for ep in range(1 if args.smoke else args.epochs):
         model.train()
         for b in dl:
@@ -107,11 +151,15 @@ def main() -> None:
             r1 = b["rgb1"].to(device)
             d0 = b["depth0"].to(device)
             rel = b["rel_pose"].to(device)
+            Kb = b["K"].to(device)
             with torch.autocast("cuda", dtype=dtype, enabled=use_cuda):
                 out = model(r0, r1)
                 ld = depth_loss(out["depth0"].float(), out["logvar0"].float(), d0, 10.0)
                 lp = pose_loss(out["rel_pose"].float(), rel)
                 loss = ld + lp
+                if args.photo_w > 0:
+                    loss = loss + args.photo_w * photometric_loss(
+                        r0.float(), r1.float(), out["depth0"].float(), out["rel_pose"].float(), Kb)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
@@ -123,15 +171,17 @@ def main() -> None:
         if args.smoke:
             break
         ate = evaluate(model, val_seq, device, args.size, max_pairs=300)
-        print(f"[epoch {ep}] val ATE={ate:.4f} m")
+        improved = ate < best_ate
+        print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
+        if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
+            best_ate = ate
+            torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "val_ate": ate},
+                       out_dir / "own-depthpose.pt")
 
     if args.smoke:
         print("SMOKE OK")
         return
-    out_dir = Path(os.environ.get("LIDAR3D_MODELS_ROOT", "models")) / "own-depthpose"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size}, out_dir / "own-depthpose.pt")
-    print(f"saved -> {out_dir / 'own-depthpose.pt'}")
+    print(f"best val ATE={best_ate:.4f} m -> {out_dir / 'own-depthpose.pt'}")
 
 
 if __name__ == "__main__":
