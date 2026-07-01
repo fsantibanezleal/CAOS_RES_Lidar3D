@@ -7,6 +7,7 @@ import type { CaseIndex, CaseManifest, Trace } from '../lib/contract.types';
 import { type Lang, t } from '../i18n';
 import { CloudViewer, type CameraMode, type ColorMode } from '../render/CloudViewer';
 import { DeckViewer } from '../render/DeckViewer';
+import { PotreeViewer } from '../render/PotreeViewer';
 
 const DETAIL_STRIDE = [8, 4, 3, 2, 1]; // point-density level 1(low)..5(full) -> draw-stride (start LOW for fluidity)
 const es = (l: Lang) => l === 'es';
@@ -25,7 +26,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('rgb');
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
-  const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels'>('three');
+  const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels' | 'potree'>('three');
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
   const [showCones, setShowCones] = useState(true);
   const [showTraj, setShowTraj] = useState(true);
@@ -111,8 +112,9 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
           <button className={'chip' + (renderer === 'three' ? ' on' : '')} onClick={() => setRenderer('three')}>three.js</button>
           <button className={'chip' + (renderer === 'deck' ? ' on' : '')} onClick={() => setRenderer('deck')}>deck.gl</button>
           <button className={'chip' + (renderer === 'surfels' ? ' on' : '')} onClick={() => setRenderer('surfels')}>{es(lang) ? 'surfels' : 'surfels'}</button>
+          <button className={'chip' + (renderer === 'potree' ? ' on' : '')} onClick={() => setRenderer('potree')}>Potree</button>
         </div>
-        <p className="hint">{es(lang) ? 'three.js puntos · deck.gl GPU a millones · surfels = discos que forman superficie' : 'three.js points · deck.gl GPU to millions · surfels = discs that form a surface'}</p>
+        <p className="hint">{es(lang) ? 'three.js puntos · deck.gl GPU · surfels superficie · Potree LOD por octree (escala a millones)' : 'three.js points · deck.gl GPU · surfels surface · Potree octree LOD (scales to millions)'}</p>
 
         <label className="lab">{es(lang) ? 'Densidad de puntos' : 'Point density'}</label>
         <input type="range" min={1} max={5} step={1} value={detail} onChange={(e) => setDetail(+e.target.value)} />
@@ -132,7 +134,9 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
       <section className="stage">
         {trace && (renderer === 'deck'
           ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />
-          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} />)}
+          : renderer === 'potree'
+            ? <PotreeViewer key={trace.case_id} trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} cameraMode={camMode} />
+            : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>
