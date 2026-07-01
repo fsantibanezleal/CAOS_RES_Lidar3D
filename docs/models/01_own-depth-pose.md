@@ -64,6 +64,25 @@ unprojects each depth into the world via the pinhole model (`geom.unproject`, Op
 Z-forward), coloring points by the RGB frame and filtering by confidence. The trajectory and per-frame observer
 frustums are emitted so the App can replay the map building up frame by frame.
 
+Three things make the fused cloud geometrically consistent rather than a diffuse spray:
+
+1. **Real intrinsics.** Each case carries the dataset's true $(f_x, f_y, c_x, c_y)$ (scaled to the working
+   resolution), so the unprojection is correct. A wrong fixed field-of-view systematically bends every frame and
+   misaligns the accumulation.
+2. **Far-depth clamp.** Points beyond a per-scene range are dropped. A small angular pose error times a large depth
+   is a large position error, so far points are where drift turns into scatter; clamping keeps the near structure
+   sharp.
+3. **ICP pose refinement.** The model's per-frame depth is sharp and its relative pose is a good prior, but raw
+   accumulation drifts. So each predicted relative pose is refined by frame-to-frame **point-to-plane ICP** (Open3D)
+   on the depth clouds, initialised from the model pose and guarded (a bad frame falls back to the raw prior, never
+   corrupting the trajectory). Model init + geometric refinement is a standard, honest visual-odometry stack; it
+   removes most of the accumulated drift, so overlapping surfaces collapse into the same voxels instead of smearing.
+   Toggle with `LIDAR3D_OWN_ICP=0`.
+
+What remains after all three is the genuine, documented limitation of feed-forward VO without a global bundle
+adjustment or loop closure: some residual drift over long sequences. That gap is exactly what the novel agenda's D1
+(learned loop closure) targets.
+
 ## What is measured: held-out ATE
 
 Model quality is reported as **Absolute Trajectory Error (ATE)**: run the model over a held-out sequence, accumulate

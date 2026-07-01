@@ -1,7 +1,7 @@
 {
   "schema": "lidar3d.index/v1",
-  "engine_version": "0.05.000",
-  "n_cases": 7,
+  "engine_version": "0.11.000",
+  "n_cases": 14,
   "cases": [
     {
       "case_id": "LID_synthetic",
@@ -9,9 +9,44 @@
       "manifest_path": "manifests/LID_synthetic.json"
     },
     {
+      "case_id": "OWN_7scenes_heads",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_7scenes_heads.json"
+    },
+    {
+      "case_id": "OWN_7scenes_stairs",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_7scenes_stairs.json"
+    },
+    {
+      "case_id": "OWN_icl_living",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_icl_living.json"
+    },
+    {
       "case_id": "OWN_tum_desk",
-      "category": "ours: trained depth+pose model (TUM RGB-D)",
+      "category": "ours: trained depth+pose model",
       "manifest_path": "manifests/OWN_tum_desk.json"
+    },
+    {
+      "case_id": "OWN_tum_desk2",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_tum_desk2.json"
+    },
+    {
+      "case_id": "OWN_tum_office",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_tum_office.json"
+    },
+    {
+      "case_id": "OWN_tum_pioneer",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_tum_pioneer.json"
+    },
+    {
+      "case_id": "OWN_tum_xyz",
+      "category": "ours: trained depth+pose model",
+      "manifest_path": "manifests/OWN_tum_xyz.json"
     },
     {
       "case_id": "SYN_orbit",
