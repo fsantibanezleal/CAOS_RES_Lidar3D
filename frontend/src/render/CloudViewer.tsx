@@ -18,8 +18,8 @@ function ramp(t: number): [number, number, number] {
   return [Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)];
 }
 
-export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode }) {
+export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const data = useRef<{ pts: Float32Array; offsets: number[]; nFrames: number } | null>(null);
@@ -162,12 +162,12 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
       shownPts = Math.floor(rev * nPts); shownFrames = Math.ceil(rev * d.nFrames);
     }
     a.cloud.geometry.setDrawRange(0, Math.max(0, shownPts));
-    if (a.trajLine) a.trajLine.geometry.setDrawRange(0, Math.max(2, shownFrames));
-    if (a.frustums) a.frustums.forEach((f: THREE.LineSegments, i: number) => { f.visible = i < shownFrames; });
+    if (a.trajLine) { a.trajLine.geometry.setDrawRange(0, Math.max(2, shownFrames)); a.trajLine.visible = showTraj; }
+    if (a.frustums) a.frustums.forEach((f: THREE.LineSegments, i: number) => { f.visible = showCones && i < shownFrames; });
     if (cameraMode === 'first') positionCamera(false); // follow the player from the camera POV
     a.render();
   }
-  useEffect(applyReveal, [reveal]);
+  useEffect(applyReveal, [reveal, showCones, showTraj]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 420 }} />;
 }
