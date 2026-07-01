@@ -109,7 +109,7 @@ footer.app { border-top: 1px solid var(--line); padding: 16px 20px; color: var(-
 footer.app a { color: var(--mut); }
 
 .modal { position: fixed; inset: 0; background: rgba(4,8,18,.72); display: flex; align-items: center; justify-content: center; z-index: 50; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; max-width: 760px; width: 92%; max-height: 86vh; overflow: auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; max-width: 820px; width: 94%; max-height: 88vh; overflow: auto; }
 .card-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .card-b { padding: 18px; }
 .diagram { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 14px; color: var(--acc2); font-size: 12px; overflow-x: auto; white-space: pre; }
