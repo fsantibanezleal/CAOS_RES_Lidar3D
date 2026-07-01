@@ -35,6 +35,9 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
   const api = useRef<any>(null);
   const data = useRef<{ pts: Float32Array; offsets: number[]; nFrames: number } | null>(null);
   const caseRef = useRef(''); // to re-fit the camera only on a NEW case, not on density/color changes
+  const orbitCam = useRef<{ p: THREE.Vector3; t: THREE.Vector3 } | null>(null); // remembered orbit view (preserved across configs/modes)
+  const modeRef = useRef<CameraMode>(cameraMode); // stale-closure-safe mode for the controls listener
+  modeRef.current = cameraMode;
 
   useEffect(() => {
     const mount = mountRef.current!;
@@ -57,7 +60,9 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const traj = new THREE.Group(); scene.add(traj);
     const grid = new THREE.GridHelper(20, 20, 0x274060, 0x18243c); grid.rotation.x = Math.PI / 2; scene.add(grid);
     const render = () => renderer.render(scene, camera);
-    controls.addEventListener('change', render);
+    // whenever the user orbits, remember it so config/mode changes can restore this exact view (no camera yank)
+    const onControls = () => { render(); if (modeRef.current === 'orbit') orbitCam.current = { p: camera.position.clone(), t: controls.target.clone() }; };
+    controls.addEventListener('change', onControls);
     const resize = () => {
       const w = mount.clientWidth || 800, h = mount.clientHeight || 520;
       renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); render();
@@ -68,7 +73,7 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     api.current = {
       scene, camera, controls, cloud, traj, render, resize, centers: [], fwds: [], bbox: null,
       dispose: () => {
-        controls.removeEventListener('change', render); removeEventListener('resize', resize); ro.disconnect();
+        controls.removeEventListener('change', onControls); removeEventListener('resize', resize); ro.disconnect();
         document.removeEventListener('visibilitychange', onVis); renderer.dispose(); mount.removeChild(renderer.domElement);
       },
     };
@@ -139,7 +144,7 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
 
     const isNewCase = caseRef.current !== trace.case_id; // preserve the user's view on density/color changes
     caseRef.current = trace.case_id;
-    positionCamera(isNewCase);
+    if (isNewCase) { orbitCam.current = null; positionCamera(true); } // ONLY re-fit on a new case; never on config changes
     applyReveal(); a.resize();
     requestAnimationFrame(() => { a.resize(); requestAnimationFrame(() => a.resize()); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,14 +165,20 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
       a.controls.target.copy(c);
       a.camera.position.copy(c.clone().add(new THREE.Vector3(0.001, r * 2.4, 0.001))); // above (+Y up)
       a.controls.minDistance = r * 0.2; a.controls.maxDistance = r * 8;
-    } else if (fit) { // orbit, only re-fit on load / switch (don't yank the user's view every frame)
-      a.controls.target.copy(c);
-      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.5, 0.45, 1).normalize().multiplyScalar(r * 2.2)));
+    } else { // orbit
       a.controls.minDistance = r * 0.05; a.controls.maxDistance = r * 10;
+      if (!fit && orbitCam.current) {                                 // restore the exact view the user had
+        a.camera.position.copy(orbitCam.current.p); a.controls.target.copy(orbitCam.current.t);
+      } else {                                                        // first fit for this case: frame it, then remember
+        a.controls.target.copy(c);
+        a.camera.position.copy(c.clone().add(new THREE.Vector3(0.5, 0.45, 1).normalize().multiplyScalar(r * 2.2)));
+        orbitCam.current = { p: a.camera.position.clone(), t: a.controls.target.clone() };
+      }
     }
     a.controls.update(); a.render();
   }
-  useEffect(() => { positionCamera(true); /* eslint-disable-next-line */ }, [cameraMode]);
+  // switching modes: recompute first/top, but RESTORE the remembered orbit view instead of re-fitting it
+  useEffect(() => { positionCamera(false); /* eslint-disable-next-line */ }, [cameraMode]);
 
   function applyReveal() {
     const a = api.current, d = data.current; if (!a || !d) return;
