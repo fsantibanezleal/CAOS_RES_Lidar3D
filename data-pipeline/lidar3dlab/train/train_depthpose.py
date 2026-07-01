@@ -147,6 +147,8 @@ def main() -> None:
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
     ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
                     help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
+    ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
+                    help="pose front-end: global-pooled Siamese MLP, or a local correlation cost volume (better pose)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -156,8 +158,10 @@ def main() -> None:
     seqs = list_sequences()
     if not seqs:
         raise SystemExit("no TUM sequences under LIDAR3D_DATA_ROOT/train/tum-rgbd (download them first)")
-    val_seq = seqs[-1]
-    train_seqs = seqs[:-1] or seqs
+    # pin the held-out sequence to long_office when present (keeps OWN_tum_office truly held-out + ATE comparable
+    # across runs); otherwise fall back to the last sequence.
+    val_seq = next((s for s in seqs if "long_office" in s), seqs[-1])
+    train_seqs = [s for s in seqs if s != val_seq] or seqs
     mp = args.max_pairs if not args.smoke else 4
     datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
     if args.use_icl:
@@ -165,7 +169,8 @@ def main() -> None:
     train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
-    model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone).to(device)
+    model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone,
+                         pose_head=args.pose_head).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
@@ -175,6 +180,8 @@ def main() -> None:
     best_ate = float("inf")
     out_dir = Path(os.environ.get("LIDAR3D_MODELS_ROOT", "models")) / "own-depthpose"
     out_dir.mkdir(parents=True, exist_ok=True)
+    import datetime as _dt
+    run_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")   # unique per run so a run NEVER clobbers another's best
     for ep in range(1 if args.smoke else args.epochs):
         model.train()
         for b in dl:
@@ -210,20 +217,22 @@ def main() -> None:
         print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
         n_params = sum(p.numel() for p in model.parameters())
         _log_experiment(out_dir, {                     # append every epoch so NO experiment is ever lost
-            "backbone": args.backbone, "epoch": ep, "val_ate": round(ate, 4), "best_ate": round(min(ate, best_ate), 4),
+            "backbone": args.backbone, "pose_head": args.pose_head, "epoch": ep, "val_ate": round(ate, 4),
+            "best_ate": round(min(ate, best_ate), 4),
             "is_best": improved, "params_M": round(n_params / 1e6, 3), "base": args.base, "size": args.size,
             "lr": args.lr, "use_icl": args.use_icl, "train_pairs": len(train), "val_seq": os.path.basename(val_seq),
         })
         if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
             best_ate = ate
             ckpt = {"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base,
-                    "backbone": args.backbone, "val_ate": ate}
-            torch.save(ckpt, out_dir / f"own-depthpose-{args.backbone}.pt")   # per-backbone archive (never clobbered)
+                    "backbone": args.backbone, "pose_head": args.pose_head, "val_ate": ate}
+            tag = f"{args.backbone}-{args.pose_head}" if args.pose_head != "siamese" else args.backbone
+            torch.save(ckpt, out_dir / f"own-depthpose-{tag}-{run_id}.pt")    # UNIQUE per-run archive (never clobbered)
             torch.save(ckpt, out_dir / "own-depthpose.pt")                    # canonical file the engine loads
             import json as _json
             (out_dir / "own-depthpose.meta.json").write_text(_json.dumps({    # small sidecar for accurate engine labels
-                "backbone": args.backbone, "val_ate": round(ate, 4), "size": args.size,
-                "base": args.base, "use_icl": args.use_icl}))
+                "backbone": args.backbone, "pose_head": args.pose_head, "val_ate": round(ate, 4),
+                "size": args.size, "base": args.base, "use_icl": args.use_icl}))
 
     if args.smoke:
         print("SMOKE OK")

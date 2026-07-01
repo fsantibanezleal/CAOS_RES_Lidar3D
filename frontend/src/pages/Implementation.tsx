@@ -12,12 +12,26 @@ export function Implementation({ lang }: { lang: Lang }) {
       <ul>
         <li><code>preprocess</code>: {en ? 'resolve and check the input frames or scans (CONTRACT 1 already validated the schema).' : 'resolver y chequear los cuadros o scans de entrada (CONTRACT 1 ya validó el esquema).'}</li>
         <li><code>feature_extraction</code>: {en ? 'per-frame quality (luma, sharpness) to flag unreliable frames.' : 'calidad por cuadro (luma, nitidez) para marcar cuadros poco fiables.'}</li>
-        <li><code>train</code>: {en ? 'dormant, an honest no-op: the engine is the pretrained lingbot-map, there is no surrogate to fit.' : 'dormido, un no-op honesto: el motor es lingbot-map pre-entrenado, no hay surrogate que ajustar.'}</li>
-        <li><code>infer</code>: {en ? 'dispatch by modality to the synthetic CPU engine (CI-safe), the real lingbot-map GPU engine, or the Open3D LiDAR engine.' : 'despacha por modalidad al motor sintético CPU (CI-safe), al motor real lingbot-map en GPU, o al motor LiDAR Open3D.'}</li>
+        <li><code>train</code>: {en ? 'ACTIVE for our own model: a real local-GPU loop (train_depthpose.py) fits our depth+pose net on TUM RGB-D + ICL-NUIM, best-checkpoint early stopping, every epoch logged. Dormant only for the vendored lingbot-map engine (nothing to fit).' : 'ACTIVO para nuestro modelo: un loop real en GPU local (train_depthpose.py) ajusta nuestra red de profundidad+pose en TUM RGB-D + ICL-NUIM, early stopping por mejor checkpoint, cada época registrada. Dormido solo para el motor vendorizado lingbot-map (nada que ajustar).'}</li>
+        <li><code>infer</code>: {en ? 'dispatch by modality/engine to the synthetic CPU engine (CI-safe), OUR trained depth+pose engine, the real lingbot-map GPU engine, or the Open3D LiDAR engine.' : 'despacha por modalidad/motor al motor sintético CPU (CI-safe), a NUESTRO motor de profundidad+pose entrenado, al motor real lingbot-map en GPU, o al motor LiDAR Open3D.'}</li>
         <li><code>refine</code>: {en ? 'the texture and color layer: clean the colored cloud and (Open3D) prepare a mesh-ready surface.' : 'la capa de textura y color: limpiar la nube coloreada y (Open3D) preparar una superficie lista para malla.'}<Cite k="open3d" /></li>
         <li><code>evaluate</code>: {en ? 'trajectory and cloud metrics (ATE/RPE only when ground-truth poses exist).' : 'métricas de trayectoria y nube (ATE/RPE solo si hay poses de referencia).'}</li>
         <li><code>export</code>: {en ? 'the compact artifact and manifest (CONTRACT 2), with the frame_offsets for the web replay.' : 'el artefacto compacto y manifest (CONTRACT 2), con los frame_offsets para el replay web.'}</li>
       </ul>
+    </>
+  );
+
+  const ownpipe = (
+    <>
+      <h3>{en ? 'Our model: train -> checkpoint -> engine -> bake -> serve' : 'Nuestro modelo: entrenar -> checkpoint -> engine -> hornear -> servir'}</h3>
+      <p>{en ? 'The OWN depth+pose model is a real, reproducible local-GPU pipeline, not a mock:' : 'El modelo OWN de profundidad+pose es un pipeline real y reproducible en GPU local, no un mock:'}</p>
+      <ul>
+        <li><b>{en ? 'Train' : 'Entrenar'}:</b> <code>train_depthpose.py --backbone resnet18 --use_icl</code> {en ? 'fits the net on real TUM RGB-D (11 sequences) + ICL-NUIM perfect-depth. Aleatoric depth NLL + se(3) pose loss, best-checkpoint early stopping. long_office is held out for the ATE.' : 'ajusta la red en TUM RGB-D real (11 secuencias) + ICL-NUIM de profundidad perfecta. NLL de profundidad aleatoria + pérdida de pose se(3), early stopping por mejor checkpoint. long_office queda held-out para el ATE.'}</li>
+        <li><b>{en ? 'Checkpoint' : 'Checkpoint'}:</b> {en ? 'a per-backbone archive (own-depthpose-<backbone>.pt) + the canonical file + a tiny meta sidecar (backbone, ATE, data) that the pipeline reads for an accurate engine label. Every epoch is appended to experiments.jsonl (nothing lost).' : 'un archivo por-backbone (own-depthpose-<backbone>.pt) + el canónico + un pequeño sidecar meta (backbone, ATE, datos) que el pipeline lee para un label preciso. Cada época se anexa a experiments.jsonl (sin perder nada).'}</li>
+        <li><b>{en ? 'Engine' : 'Motor'}:</b> {en ? 'own_engine runs the model over the ordered RGB frames (real per-dataset intrinsics), then the pose-refinement ladder (ICP, optionally global pose-graph / TSDF), then unprojects into a fused RGB cloud.' : 'own_engine corre el modelo sobre los cuadros RGB ordenados (intrínsecas reales por dataset), luego el ladder de refinamiento de pose (ICP, opcionalmente pose-graph global / TSDF), y desproyecta en una nube RGB fusionada.'}<Cite k="open3d" /></li>
+        <li><b>{en ? 'Bake + serve' : 'Hornear + servir'}:</b> {en ? 'the compact trace (CONTRACT 2) + a committed Potree octree; the static site replays them. Weights stay off-git (LIDAR3D_MODELS_ROOT); only the small experiment ledger is versioned.' : 'el trace compacto (CONTRACT 2) + un octree Potree commiteado; el sitio estático los reproduce. Los pesos quedan fuera de git (LIDAR3D_MODELS_ROOT); solo el pequeño ledger de experimentos se versiona.'}</li>
+      </ul>
+      <p className="muted">{en ? 'The model is agnostic behind one reconstruct(spec) -> ReconResult contract, so control / classical / SOTA-reference / OURS engines are directly comparable. Add a case by pointing the engine at any folder of ordered RGB frames.' : 'El modelo es agnóstico tras un contrato reconstruct(spec) -> ReconResult, así los motores control / clásico / referencia-SOTA / NUESTRO son directamente comparables. Agregar un caso = apuntar el motor a cualquier carpeta de cuadros RGB ordenados.'}</p>
     </>
   );
 
@@ -57,6 +71,7 @@ export function Implementation({ lang }: { lang: Lang }) {
         : 'El repo se instancia del template de producto CAOS (ADR-0057): una base congelada con un pipeline por etapas, dos contratos de datos, un gate de lane medido y un frontend de replay estático. El trabajo vive solo en el core (el motor, los visuales, los casos).'}</p>
       <SubTabs tabs={[
         { id: 'pipe', label: en ? 'Staged pipeline' : 'Pipeline por etapas', body: <>{pipeline}<Refs ids={['open3d', 'lingbot', 'kissicp']} /></> },
+        { id: 'ownpipe', label: en ? 'Our model pipeline' : 'Pipeline de nuestro modelo', body: <>{ownpipe}<Refs ids={['open3d', 'tum', 'iclnuim']} /></> },
         { id: 'contracts', label: en ? 'Data contracts' : 'Contratos de datos', body: contracts },
         { id: 'gate', label: en ? 'Lane gate' : 'Gate de lane', body: gate },
         { id: 'env', label: en ? 'Environment' : 'Entorno', body: envtab },

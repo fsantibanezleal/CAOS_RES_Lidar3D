@@ -171,19 +171,55 @@ class SiamesePoseHead(nn.Module):
         return self.mlp(torch.cat([g0, g1], 1))
 
 
+class CorrPoseHead(nn.Module):
+    """Regresses se(3) from a LOCAL CORRELATION cost volume between the two frames' feature maps. For every spatial
+    location it correlates frame-0 features against a (2d+1)^2 window of frame-1 features, which encodes the apparent
+    pixel motion, the signal relative pose actually depends on, and which global pooling (Siamese) discards. A small
+    convnet + zero-init MLP maps the cost volume (plus frame-0 context) to the se(3) tangent. This is the RAFT/
+    TartanVO-style pose front-end; it targets the pose-accuracy bottleneck that bounds the fused map."""
+
+    def __init__(self, feat: int = 256, disp: int = 4):
+        super().__init__()
+        self.disp = disp
+        cc = (2 * disp + 1) ** 2
+        self.enc = nn.Sequential(conv(cc + feat, 128, s=2), conv(128, 128, s=2),
+                                 conv(128, 128, s=2), nn.AdaptiveAvgPool2d(1))
+        self.head = nn.Linear(128, 6)
+        self.head.weight.data.mul_(0.01)
+        self.head.bias.data.zero_()
+
+    def _corr(self, f0: torch.Tensor, f1: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = f0.shape
+        f0n = F.normalize(f0, dim=1)
+        f1p = F.pad(F.normalize(f1, dim=1), (self.disp,) * 4)
+        outs = []
+        for dy in range(2 * self.disp + 1):
+            for dx in range(2 * self.disp + 1):
+                outs.append((f0n * f1p[:, :, dy:dy + h, dx:dx + w]).sum(1, keepdim=True))
+        return torch.cat(outs, 1)                         # [B, (2d+1)^2, H, W]
+
+    def forward(self, f0: torch.Tensor, f1: torch.Tensor) -> torch.Tensor:
+        x = self.enc(torch.cat([self._corr(f0, f1), f0], 1)).flatten(1)
+        return self.head(x)
+
+
 class OwnDepthPose(nn.Module):
     """The full model: per-frame depth+conf and pairwise relative pose. Two interchangeable backbones behind one
     forward signature: "scratch" (DepthNet + PoseNet, zero external weights) or "resnet18" (ImageNet encoder
     shared by DepthDecoder + SiamesePoseHead). Everything but the ResNet features is ours."""
 
     def __init__(self, base: int = 32, max_depth: float = 10.0, backbone: str = "scratch",
-                 pretrained: bool = True):
+                 pretrained: bool = True, pose_head: str = "siamese"):
         super().__init__()
         self.backbone = backbone
+        self.pose_head = pose_head
         if backbone == "resnet18":
             self.enc = PretrainedEncoder(pretrained=pretrained)
             self.dec = DepthDecoder(self.enc.out_ch, base, max_depth)
-            self.posehead = SiamesePoseHead(self.enc.out_ch[-1])
+            if pose_head == "corr":
+                self.posehead = CorrPoseHead(feat=self.enc.out_ch[3])   # correlation on layer3 (/16) features
+            else:
+                self.posehead = SiamesePoseHead(self.enc.out_ch[-1])
         else:
             self.depth = DepthNet(base, max_depth)
             self.pose = PoseNet()
@@ -193,7 +229,10 @@ class OwnDepthPose(nn.Module):
             f0 = self.enc(rgb0)
             f1 = self.enc(rgb1)
             depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
-            xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
+            if self.pose_head == "corr":
+                xi = self.posehead(f0[3], f1[3])                        # correlation cost volume -> se(3)
+            else:
+                xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
         else:
             depth0, logvar0 = self.depth(rgb0)
             xi = self.pose(rgb0, rgb1)
