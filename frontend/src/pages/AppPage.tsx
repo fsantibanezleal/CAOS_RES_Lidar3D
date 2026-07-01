@@ -6,6 +6,7 @@ import { loadIndex, loadManifest, loadTrace } from '../api/artifacts';
 import type { CaseIndex, CaseManifest, Trace } from '../lib/contract.types';
 import { type Lang, t } from '../i18n';
 import { CloudViewer, type CameraMode, type ColorMode } from '../render/CloudViewer';
+import { DeckViewer } from '../render/DeckViewer';
 
 const DETAIL_STRIDE = [8, 4, 3, 2, 1]; // point-density level 1(low)..5(full) -> draw-stride (start LOW for fluidity)
 const es = (l: Lang) => l === 'es';
@@ -24,6 +25,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('rgb');
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
+  const [renderer, setRenderer] = useState<'three' | 'deck'>('three');
   const raf = useRef(0);
 
   useEffect(() => {
@@ -95,6 +97,13 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
           {CAMS.map(([m, lab]) => <button key={m} className={'chip' + (camMode === m ? ' on' : '')} onClick={() => setCamMode(m)}>{lab}</button>)}
         </div>
 
+        <label className="lab">{es(lang) ? 'Motor de render' : 'Renderer'}</label>
+        <div className="chips">
+          <button className={'chip' + (renderer === 'three' ? ' on' : '')} onClick={() => setRenderer('three')}>three.js</button>
+          <button className={'chip' + (renderer === 'deck' ? ' on' : '')} onClick={() => setRenderer('deck')}>deck.gl</button>
+        </div>
+        <p className="hint">{es(lang) ? 'deck.gl escala a millones (GPU); three.js es liviano' : 'deck.gl scales to millions (GPU); three.js is light'}</p>
+
         <label className="lab">{es(lang) ? 'Densidad de puntos' : 'Point density'}</label>
         <input type="range" min={1} max={5} step={1} value={detail} onChange={(e) => setDetail(+e.target.value)} />
         <p className="hint">{es(lang) ? 'Parte baja para fluidez; súbela hasta donde rinda tu equipo' : 'Starts low for fluidity; raise it as far as your machine handles'}</p>
@@ -111,7 +120,9 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
       </aside>
 
       <section className="stage">
-        {trace && <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} />}
+        {trace && (renderer === 'deck'
+          ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} />
+          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>

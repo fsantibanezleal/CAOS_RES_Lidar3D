@@ -3,6 +3,15 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.07.000] · 2026-07-01
+
+### Added (scalable viewer: deck.gl, selectable)
+- **deck.gl PointCloudLayer viewer** (`render/DeckViewer.tsx`): GPU-instanced, scales to millions; progressive
+  replay is done GPU-side with `DataFilterExtension` (filters points by order index vs the revealed count, so
+  replay costs nothing per frame). Same prop interface as the three.js viewer.
+- **Renderer selector** in the App (three.js / deck.gl): the light three.js path stays the default; deck.gl is
+  the scale path. (Potree + the out-of-core octree + uncap are the next step per the beyond-SOTA plan.)
+
 ## [0.06.000] · 2026-07-01
 
 ### Added (OUR own trainable model + model-agnostic engine + a real training surface)
