@@ -1,6 +1,6 @@
 {
   "schema": "lidar3d.index/v1",
-  "engine_version": "0.11.000",
+  "engine_version": "0.12.000",
   "n_cases": 14,
   "cases": [
     {

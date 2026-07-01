@@ -145,6 +145,7 @@ def main() -> None:
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
+    ap.add_argument("--seqs", type=str, default="", help="comma-separated substrings; keep only matching TUM train sequences (e.g. 'freiburg1_desk,freiburg1_xyz'). Empty = all discovered")
     ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
                     help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
     ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
@@ -162,6 +163,9 @@ def main() -> None:
     # across runs); otherwise fall back to the last sequence.
     val_seq = next((s for s in seqs if "long_office" in s), seqs[-1])
     train_seqs = [s for s in seqs if s != val_seq] or seqs
+    if args.seqs:                                   # keep only the requested train subset (reproduce a specific config)
+        wanted = [w.strip() for w in args.seqs.split(",") if w.strip()]
+        train_seqs = [s for s in train_seqs if any(w in s for w in wanted)] or train_seqs
     mp = args.max_pairs if not args.smoke else 4
     datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
     if args.use_icl:
