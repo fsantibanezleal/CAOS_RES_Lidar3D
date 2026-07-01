@@ -72,16 +72,28 @@ Three things make the fused cloud geometrically consistent rather than a diffuse
 2. **Far-depth clamp.** Points beyond a per-scene range are dropped. A small angular pose error times a large depth
    is a large position error, so far points are where drift turns into scatter; clamping keeps the near structure
    sharp.
-3. **ICP pose refinement.** The model's per-frame depth is sharp and its relative pose is a good prior, but raw
-   accumulation drifts. So each predicted relative pose is refined by frame-to-frame **point-to-plane ICP** (Open3D)
-   on the depth clouds, initialised from the model pose and guarded (a bad frame falls back to the raw prior, never
-   corrupting the trajectory). Model init + geometric refinement is a standard, honest visual-odometry stack; it
-   removes most of the accumulated drift, so overlapping surfaces collapse into the same voxels instead of smearing.
-   Toggle with `LIDAR3D_OWN_ICP=0`.
+3. **Pose refinement ladder.** The model's per-frame depth is sharp and its relative pose is a good prior, but raw
+   accumulation drifts. The engine has a three-rung refinement ladder (each falls back to the previous on failure),
+   so the fused map is as consistent as the pose accuracy allows:
+   - **Frame-to-frame ICP** (default, `LIDAR3D_OWN_ICP`): each predicted relative pose is refined by point-to-plane
+     ICP (Open3D) on the depth clouds, initialised from the model pose and guarded (a bad frame falls back to the
+     raw prior, never corrupting the trajectory). Removes most local drift.
+   - **D1: global pose-graph optimization + loop closure** (opt-in, `LIDAR3D_OWN_GLOBAL=1`): Open3D multiway
+     registration builds odometry edges plus loop-closure edges (spatially-near but temporally-distant frames that
+     still align) and distributes the drift globally so revisited places snap together. This is the classic
+     bundle-adjustment-style fix and is fully implemented.
+   - **TSDF volumetric fusion** (opt-in, `LIDAR3D_OWN_TSDF=1`): integrate every confident, near depth frame into a
+     truncated signed-distance volume and extract a single *denoised* surface (KinectFusion-style). Volumetric
+     averaging cancels the per-frame monocular depth noise that no pose refinement can remove.
 
-What remains after all three is the genuine, documented limitation of feed-forward VO without a global bundle
-adjustment or loop closure: some residual drift over long sequences. That gap is exactly what the novel agenda's D1
-(learned loop closure) targets.
+**Honest finding (why the defaults are ICP, not D1/TSDF).** D1 and TSDF are the correct tools for a *clean surface*,
+but both need sub-voxel pose accuracy. At the current monocular pose accuracy (~0.37 m held-out ATE), global
+optimization over-constrains single-area indoor sweeps and TSDF fuses only sparsely (frames disagree, so most of the
+volume cancels out). So the shipped default is the ICP-refined raw accumulation, which is the most robust at this
+accuracy. D1 and TSDF are implemented and one flag away; they become the right default the moment the pose model
+improves. The real lever for a clean surface is therefore **a stronger pose model (more training data)**, not more
+post-processing, which is why the training set is being grown. This is the genuine, documented limitation of
+feed-forward monocular reconstruction: the per-frame depth is excellent; the fused map is bounded by pose accuracy.
 
 ## What is measured: held-out ATE
 
