@@ -48,4 +48,6 @@ class ReconResult:
     path_length: float = 0.0              # metric trajectory length (m)
     bbox_min: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     bbox_max: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    depth_thumbs: list[dict] = field(default_factory=list)  # a few {idx, png_b64} keyframes for the panel
+    depth_thumbs: list[dict] = field(default_factory=list)  # per-frame {idx, png_b64} depth previews for the panel
+    rgb_thumbs: list[dict] = field(default_factory=list)     # per-frame {idx, png_b64} RGB previews (camera cases)
+    frame_offsets: list[int] = field(default_factory=list)   # cumulative kept-point count per frame (progressive replay)
