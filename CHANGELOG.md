@@ -3,6 +3,12 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.10.001] · 2026-07-01
+
+### Fixed
+- Potree colors were washed out to white: set the material `inputColorEncoding` to sRGB (+ neutral point size)
+  so the octree renders the baked RGB correctly, matching three.js/deck.gl.
+
 ## [0.10.000] · 2026-07-01
 
 ### Added (Potree: the third, truly scalable renderer + the offline octree pipeline)
