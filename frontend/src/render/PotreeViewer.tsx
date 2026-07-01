@@ -61,6 +61,8 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode }:
       pco.material.size = Math.max(0.5, pointSize * 45);
       pco.material.shape = 1;                             // circular points
       pco.material.pointColorType = PointColorType.RGB;   // use the baked RGB (else it defaults to white/height)
+      try { (pco.material as any).inputColorEncoding = 1; (pco.material as any).outputColorEncoding = 1; } catch { /* older api */ }
+      pco.material.needsUpdate = true;
       a.scene.add(pco); a.pco = pco;
       a.potree.pointBudget = Math.round(3_000_000 / Math.max(1, density));
       // fit orbit to the octree bounding box

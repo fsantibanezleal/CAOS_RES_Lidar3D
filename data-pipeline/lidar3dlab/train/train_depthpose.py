@@ -120,6 +120,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--max_pairs", type=int, default=None, help="cap pairs per sequence (smoke test)")
     ap.add_argument("--photo_w", type=float, default=0.0, help="self-supervised photometric loss weight (0=off)")
+    ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -135,7 +136,7 @@ def main() -> None:
     train = ConcatDataset([TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs])
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
-    model = OwnDepthPose(max_depth=10.0).to(device)
+    model = OwnDepthPose(base=args.base, max_depth=10.0).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
           f"params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")
@@ -175,7 +176,7 @@ def main() -> None:
         print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
         if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
             best_ate = ate
-            torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "val_ate": ate},
+            torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base, "val_ate": ate},
                        out_dir / "own-depthpose.pt")
 
     if args.smoke:
