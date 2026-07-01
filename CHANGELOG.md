@@ -3,6 +3,13 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.000] · 2026-07-01
+
+### Changed (lift the point cap)
+- The committed-artifact point budget (my earlier unauthorized 120k "toy" cap) is lifted to 1,000,000 and made
+  overridable via `LIDAR3D_MAX_POINTS`. The deck.gl renderer scales to that; three.js stays the light path. The
+  OUR-model case is re-baked denser (111k points).
+
 ## [0.08.000] · 2026-07-01
 
 ### Added (ADR-0058: the 5-tab architecture modal)

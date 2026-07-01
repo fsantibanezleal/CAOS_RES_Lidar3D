@@ -5,13 +5,17 @@ Uint8 rgb, Float32 poses) to stay compact. Schema id is versioned. Deterministic
 from __future__ import annotations
 
 import base64
+import os
 
 import numpy as np
 
 from ..io.schema import ReconResult
 
 TRACE_SCHEMA = "lidar3d.recon/v1"
-MAX_POINTS = 120_000   # committed replay-artifact budget; decimate further if larger
+# committed replay-artifact budget. Overridable via LIDAR3D_MAX_POINTS (the deck.gl renderer scales to millions;
+# three.js is the light path). NOT an arbitrary toy cap: it bounds the git artifact size, decimating with a
+# stride (order-preserving) only when a cloud exceeds it.
+MAX_POINTS = int(os.environ.get("LIDAR3D_MAX_POINTS", "1000000"))
 
 
 def _b64_f32(a: np.ndarray) -> str:
