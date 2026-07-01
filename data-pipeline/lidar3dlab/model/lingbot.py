@@ -15,7 +15,7 @@ import torch
 
 from ..config import checkpoint_path
 from ..io.schema import ReconResult, SequenceSpec
-from .geometry import depth_to_png_b64, trajectory_length, unproject_depth
+from .geometry import depth_to_png_b64, rgb_to_png_b64, trajectory_length, unproject_depth
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".PNG", ".JPG")
 
@@ -69,7 +69,7 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
     depth = np.asarray(pred["depth"]).reshape(S, H, W)
     conf = np.asarray(pred.get("depth_conf")).reshape(S, H, W) if "depth_conf" in pred else None
 
-    all_p, all_c, per_frame, thumbs = [], [], [], []
+    all_p, all_c, per_frame, thumbs, rthumbs = [], [], [], [], []
     for i in range(S):
         thr = float(np.quantile(conf[i], spec.conf_quantile)) if conf is not None else None
         p, c = unproject_depth(depth[i], K[i], c2w[i], rgb_all[i], decimate=spec.decimation,
@@ -79,13 +79,14 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         per_frame.append({"idx": i, "conf_mean": float(np.nanmean(conf[i])) if conf is not None else 0.0,
                           "n_points": int(len(p)), "depth_min": float(depth[i].min()),
                           "depth_max": float(depth[i].max())})
-        if i % max(1, S // 4) == 0:
+        if i % max(1, S // 48) == 0 or i == S - 1:            # ~48 keyframes for the per-frame panel
             thumbs.append({"idx": i, "png_b64": depth_to_png_b64(depth[i])})
+            rthumbs.append({"idx": i, "png_b64": rgb_to_png_b64(rgb_all[i])})
     pts = np.concatenate(all_p).astype(np.float32)
     cols = np.concatenate(all_c).astype(np.uint8)
     centers = c2w[:, :, 3]
     return ReconResult(
         case_id=spec.case_id, n_frames=S, poses_c2w=c2w[:, :3, :4].reshape(S, 12).astype(np.float32),
         points=pts, colors=cols, per_frame=per_frame, path_length=trajectory_length(centers),
-        bbox_min=pts.min(0).tolist(), bbox_max=pts.max(0).tolist(), depth_thumbs=thumbs,
+        bbox_min=pts.min(0).tolist(), bbox_max=pts.max(0).tolist(), depth_thumbs=thumbs, rgb_thumbs=rthumbs,
     )

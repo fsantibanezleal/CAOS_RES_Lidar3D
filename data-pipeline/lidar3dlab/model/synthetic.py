@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..io.schema import ReconResult, SequenceSpec
-from .geometry import depth_to_png_b64, trajectory_length, unproject_depth
+from .geometry import depth_to_png_b64, rgb_to_png_b64, trajectory_length, unproject_depth
 
 _H, _W = 96, 128
 
@@ -39,10 +39,10 @@ def _frame_depth_rgb(t: float) -> tuple[np.ndarray, np.ndarray]:
 
 def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
     rng = np.random.default_rng(seed)
-    S = int(max(8, min(spec.max_frames, 48)))
+    S = int(max(8, min(spec.max_frames, 160)))
     K = _intrinsics()
     dec = max(2, spec.decimation // 2)
-    all_p, all_c, per_frame, centers, poses, thumbs = [], [], [], [], [], []
+    all_p, all_c, per_frame, centers, poses, thumbs, rthumbs = [], [], [], [], [], [], []
     jitter = rng.normal(0, 0.01, size=(S, 2))
     for i in range(S):
         # the camera looks +Z (OpenCV convention, same as the real engine) and MOVES +Z into the corridor it is
@@ -59,8 +59,9 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         poses.append(c2w[:3, :4].reshape(-1).astype(np.float32))
         per_frame.append({"idx": i, "conf_mean": 1.0, "n_points": int(len(p)),
                           "depth_min": float(depth.min()), "depth_max": float(depth.max())})
-        if i % max(1, S // 4) == 0:
+        if i % max(1, S // 48) == 0 or i == S - 1:            # ~48 keyframes for the per-frame panel
             thumbs.append({"idx": i, "png_b64": depth_to_png_b64(depth)})
+            rthumbs.append({"idx": i, "png_b64": rgb_to_png_b64(rgb)})
     pts = np.concatenate(all_p).astype(np.float32)
     cols = np.concatenate(all_c).astype(np.uint8)
     centers = np.asarray(centers, np.float32)
@@ -68,5 +69,5 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         case_id=spec.case_id, n_frames=S, poses_c2w=np.asarray(poses, np.float32),
         points=pts, colors=cols, per_frame=per_frame,
         path_length=trajectory_length(centers),
-        bbox_min=pts.min(0).tolist(), bbox_max=pts.max(0).tolist(), depth_thumbs=thumbs,
+        bbox_min=pts.min(0).tolist(), bbox_max=pts.max(0).tolist(), depth_thumbs=thumbs, rgb_thumbs=rthumbs,
     )

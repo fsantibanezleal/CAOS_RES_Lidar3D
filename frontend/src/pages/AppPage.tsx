@@ -26,6 +26,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [colorMode, setColorMode] = useState<ColorMode>('rgb');
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
   const [renderer, setRenderer] = useState<'three' | 'deck'>('three');
+  const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
   const raf = useRef(0);
 
   useEffect(() => {
@@ -130,16 +131,16 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
       <aside className="panel">
         <label className="lab">{es(lang) ? 'Vista por cuadro (sigue al player)' : 'Per-frame view (follows the player)'}</label>
-        {depthT ? (
-          <>
-            <p className="hint">{es(lang) ? 'Profundidad' : 'Depth'} · {es(lang) ? 'cuadro' : 'frame'} {depthT.idx}/{trace!.n_frames}</p>
-            <img className="depth" src={depthT.png_b64} alt="per-frame depth" />
-            {rgbT && (<>
-              <p className="hint">RGB · {es(lang) ? 'cuadro' : 'frame'} {rgbT.idx}/{trace!.n_frames}</p>
-              <img className="depth" src={rgbT.png_b64} alt="per-frame rgb" />
-            </>)}
-          </>
-        ) : <p className="hint">{es(lang) ? 'sin vista de cámara para este caso' : 'no camera view for this case'}</p>}
+        <div className="chips">
+          <button className={'chip' + ((rightTab === 'depth' || !rgbT) ? ' on' : '')} onClick={() => setRightTab('depth')}>{es(lang) ? 'Profundidad' : 'Depth'}</button>
+          {rgbT && <button className={'chip' + (rightTab === 'rgb' ? ' on' : '')} onClick={() => setRightTab('rgb')}>RGB</button>}
+        </div>
+        {(() => {
+          const show = rightTab === 'rgb' && rgbT ? rgbT : depthT;
+          return show
+            ? <><img className="depth" src={show.png_b64} alt="per-frame view" /><p className="hint">{(rightTab === 'rgb' && rgbT) ? 'RGB' : (es(lang) ? 'Profundidad' : 'Depth')} · {es(lang) ? 'cuadro' : 'frame'} {show.idx}/{trace!.n_frames}</p></>
+            : <p className="hint">{es(lang) ? 'sin vista para este caso' : 'no view for this case'}</p>;
+        })()}
 
         {manifest && (
           <>

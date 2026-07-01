@@ -79,8 +79,9 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
             all_c.append(c)
             per_frame.append({"idx": i, "conf_mean": float(conf.mean()), "n_points": int(len(p)),
                               "depth_min": float(depth.min()), "depth_max": float(depth.max())})
-            dth.append({"idx": i, "png_b64": depth_to_png_b64(depth)})
-            rth.append({"idx": i, "png_b64": _rgb_png_b64(rgb)})
+            if i % max(1, len(rgbs) // 48) == 0 or i == len(rgbs) - 1:   # ~48 keyframes for the panel
+                dth.append({"idx": i, "png_b64": depth_to_png_b64(depth)})
+                rth.append({"idx": i, "png_b64": _rgb_png_b64(rgb)})
             if i + 1 < len(rgbs):                        # advance the trajectory by the predicted relative pose
                 c2w = c2w @ out["rel_pose"][0].float().cpu().numpy()
     pts = np.concatenate(all_p).astype(np.float32)

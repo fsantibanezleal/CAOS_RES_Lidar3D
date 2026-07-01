@@ -40,6 +40,18 @@ def trajectory_length(centers: np.ndarray) -> float:
     return float(np.linalg.norm(np.diff(centers, axis=0), axis=1).sum())
 
 
+def rgb_to_png_b64(rgb01: np.ndarray) -> str:
+    """Small base64 PNG of an RGB frame (H,W,3 float 0..1) for the replay panel's RGB view."""
+    import base64
+    import io
+
+    from PIL import Image
+    a = (np.clip(rgb01, 0, 1) * 255).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(a).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 def depth_to_png_b64(depth: np.ndarray, cmap: str = "turbo") -> str:
     """Small base64 PNG of a depth map for the live/replay panel (a few keyframes only)."""
     import base64
