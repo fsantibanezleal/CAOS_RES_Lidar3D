@@ -92,8 +92,8 @@ select { background: var(--bg2); color: var(--txt); border: 1px solid var(--line
 .depth { width: 100%; border-radius: 8px; border: 1px solid var(--line); background: var(--bg2); margin-bottom: 6px; }
 table.stats { width: 100%; border-collapse: collapse; }
 table.stats td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
-table.stats td:first-child { color: var(--mut); }
-table.stats td:last-child { text-align: right; color: var(--acc); font-weight: 600; font-variant-numeric: tabular-nums; }
+table.stats td:first-child { color: var(--mut); white-space: nowrap; }
+table.stats td:last-child { text-align: right; color: var(--acc); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; word-break: break-word; }
 
 .primary { background: var(--acc); color: #06231a; border: 1px solid var(--acc); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; font-weight: 600; }
 
