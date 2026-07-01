@@ -77,6 +77,18 @@ def photometric_loss(rgb0: torch.Tensor, rgb1: torch.Tensor, depth0: torch.Tenso
     return (per * v).sum() / v.sum().clamp(min=1.0)
 
 
+def smoothness_loss(depth: torch.Tensor, rgb: torch.Tensor) -> torch.Tensor:
+    """Edge-aware depth smoothness (Monodepth2-style): penalize depth gradients, down-weighted where the image
+    has edges. Makes the depth (and thus the point cloud) cleaner / less noisy."""
+    d = depth / (depth.mean(dim=[2, 3], keepdim=True) + 1e-6)
+    dx = (d[:, :, :, :-1] - d[:, :, :, 1:]).abs()
+    dy = (d[:, :, :-1, :] - d[:, :, 1:, :]).abs()
+    g = rgb.mean(1, keepdim=True)
+    wx = torch.exp(-(g[:, :, :, :-1] - g[:, :, :, 1:]).abs() * 10)
+    wy = torch.exp(-(g[:, :, :-1, :] - g[:, :, 1:, :]).abs() * 10)
+    return (dx * wx).mean() + (dy * wy).mean()
+
+
 def umeyama_ate(pred_c: np.ndarray, gt_c: np.ndarray) -> float:
     """RMS ATE after a rigid (R,t) alignment of the predicted trajectory to the GT (no scale)."""
     mp, mg = pred_c.mean(0), gt_c.mean(0)
@@ -121,6 +133,7 @@ def main() -> None:
     ap.add_argument("--max_pairs", type=int, default=None, help="cap pairs per sequence (smoke test)")
     ap.add_argument("--photo_w", type=float, default=0.0, help="self-supervised photometric loss weight (0=off)")
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
+    ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -138,6 +151,7 @@ def main() -> None:
 
     model = OwnDepthPose(base=args.base, max_depth=10.0).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
           f"params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
@@ -161,9 +175,13 @@ def main() -> None:
                 if args.photo_w > 0:
                     loss = loss + args.photo_w * photometric_loss(
                         r0.float(), r1.float(), out["depth0"].float(), out["rel_pose"].float(), Kb)
+                if args.smooth_w > 0:
+                    loss = loss + args.smooth_w * smoothness_loss(out["depth0"].float(), r0.float())
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
+            if not args.smoke:
+                sched.step()
             steps += 1
             if steps % 20 == 0 or args.smoke:
                 print(f"ep{ep} step{steps} loss={loss.item():.4f} depth={ld.item():.4f} pose={lp.item():.4f}")
