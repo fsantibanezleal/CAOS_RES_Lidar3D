@@ -3,6 +3,16 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.10.000] · 2026-07-01
+
+### Added (Potree: the third, truly scalable renderer + the offline octree pipeline)
+- **Potree renderer** (`render/PotreeViewer.tsx` + potree-core): loads a committed octree and renders it with
+  real level-of-detail streaming (point budget), so it scales to millions of points. Fourth renderer option
+  alongside three.js / deck.gl / surfels. LOD needs a render loop; it pauses on a hidden tab (no idle CPU).
+- **Offline octree pipeline** (`lidar3dlab/potree.py`): exports each committed trace to LAS and runs
+  PotreeConverter (native binary, path via LIDAR3D_POTREECONVERTER) into `public/potree/<case>/` (committed
+  static octrees). Baked in the render frame so Potree matches three.js/deck.gl. Added `laspy` to requirements.
+
 ## [0.09.005] · 2026-07-01
 
 ### Added (the third render method)
