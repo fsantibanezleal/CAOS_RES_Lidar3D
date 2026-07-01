@@ -3,6 +3,12 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.005] · 2026-07-01
+
+### Added (the third render method)
+- **surfels** renderer: a third viewer alongside three.js (points) and deck.gl (GPU). Points render as soft
+  round discs that merge into a surface, a distinct surface-splat look that reads less "diffuse" than raw points.
+
 ## [0.09.004] · 2026-07-01
 
 ### Fixed (our model quality)

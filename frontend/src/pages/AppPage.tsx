@@ -25,7 +25,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('rgb');
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
-  const [renderer, setRenderer] = useState<'three' | 'deck'>('three');
+  const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels'>('three');
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
   const [showCones, setShowCones] = useState(true);
   const [showTraj, setShowTraj] = useState(true);
@@ -110,8 +110,9 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         <div className="chips">
           <button className={'chip' + (renderer === 'three' ? ' on' : '')} onClick={() => setRenderer('three')}>three.js</button>
           <button className={'chip' + (renderer === 'deck' ? ' on' : '')} onClick={() => setRenderer('deck')}>deck.gl</button>
+          <button className={'chip' + (renderer === 'surfels' ? ' on' : '')} onClick={() => setRenderer('surfels')}>{es(lang) ? 'surfels' : 'surfels'}</button>
         </div>
-        <p className="hint">{es(lang) ? 'deck.gl escala a millones (GPU); three.js es liviano' : 'deck.gl scales to millions (GPU); three.js is light'}</p>
+        <p className="hint">{es(lang) ? 'three.js puntos · deck.gl GPU a millones · surfels = discos que forman superficie' : 'three.js points · deck.gl GPU to millions · surfels = discs that form a surface'}</p>
 
         <label className="lab">{es(lang) ? 'Densidad de puntos' : 'Point density'}</label>
         <input type="range" min={1} max={5} step={1} value={detail} onChange={(e) => setDetail(+e.target.value)} />
@@ -131,7 +132,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
       <section className="stage">
         {trace && (renderer === 'deck'
           ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />
-          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />)}
+          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>
