@@ -3,6 +3,28 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.05.000] · 2026-06-30
+
+### Added (ADR compliance + deep content: header/footer/modal + tabbed pages)
+- **Header** now uses real SVG icons (GitHub, personal site, portfolio, architecture, theme) instead of glyph
+  word-links, and shows the app version; **footer** shows the version too (ADR-0016).
+- **Architecture modal** (ADR-0058): the ASCII lane sketch is replaced by a high-quality, theme-aware SVG of
+  the three lanes and the data flow. New reusable `Diagrams.tsx` (lanes, the GCT network, the attention
+  context) and an `Icons.tsx` SVG set.
+- **Every content page is now tabbed and deep** (ADR-0016): sub-tabs, KaTeX equations, inline citations, and a
+  shared bibliography (`References.tsx`, 25 sourced refs).
+  - Methodology: State of the art (the DUSt3R to VGGT to lingbot-map lineage, per-method table), Networks (the
+    frozen DINOv2 backbone, the 24 alternating blocks, the heads, with the GCT diagram), Geometric Context (the
+    three-tier attention with the token-count argument and diagram), and Geometry (SE(3) pose, the boxed
+    depth-to-world unprojection, the LiDAR ICP objective).
+  - Benchmark: results per model as a ladder (classical ICP / KISS-ICP, SOTA lingbot-map, novel D1 to D3) plus
+    the reported per-model ATE table and this lab measured numbers, honestly labelled.
+  - Introduction, Implementation, Experiments (with the D1 to D5 novel agenda) reworked into sub-tabs.
+
+### Fixed
+- Removed em-dash separators and prose arrows across the frontend (a stray template `architecture.ts.txt`,
+  two code comments, the empty-value markers) to match the house style.
+
 ## [0.04.000] · 2026-06-30
 
 ### Added (App workbench: replay the reconstruction + viewer controls)
