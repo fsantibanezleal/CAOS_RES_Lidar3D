@@ -1,7 +1,26 @@
 # Changelog
 
-All notable changes to this product. Format: `X.XX.XXX` (display) — see `lidar3dlab.__version__`. Keep `0.x`
+All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
+
+## [0.04.000] · 2026-06-30
+
+### Added (App workbench: replay the reconstruction + viewer controls)
+- **Replay**: each case auto-plays the reconstruction building up frame by frame (the streaming process
+  generating), with a Replay button + a scrub slider. It runs a single pass then stops and pauses on a hidden
+  tab (no idle CPU). Backed by a new `frame_offsets` field in the trace (CONTRACT 2): the cumulative point
+  count per frame, so the web reveals points in exact frame order.
+- **Point-density control**: a slider that starts LOW (fewer drawn points for a fluid first load) and rises to
+  full detail; it resets to low on reload so the page never opens under heavy load. Each user raises it as far
+  as their machine handles.
+- **Color mode**: a toggle between RGB (camera texture) and a LiDAR height ramp; it defaults to the ramp for
+  LiDAR cases (no camera) and to RGB for camera cases.
+
+### Fixed
+- `trace.py` now actually emits `frame_offsets` (it was computed then dropped from the returned dict); when
+  per-frame provenance is inconsistent it falls back to an even per-frame split (points are still in frame order).
+- Viewer first paint: `preserveDrawingBuffer` + a `ResizeObserver` so a settled static frame stays painted
+  instead of compositing blank.
 
 ## [0.03.000] · 2026-06-30
 

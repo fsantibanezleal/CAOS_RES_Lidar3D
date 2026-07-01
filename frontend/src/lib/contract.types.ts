@@ -43,6 +43,7 @@ export interface Trace {
   colors_b64: string; // Uint8   [n_points*3] RGB 0..255
   poses_b64: string;  // Float32 [n_frames*12] camera-to-world (row-major 3x4)
   per_frame: PerFrame[];
+  frame_offsets?: number[]; // cumulative point count up to & including each frame (for progressive replay)
   path_length: number;
   bbox_min: number[];
   bbox_max: number[];
