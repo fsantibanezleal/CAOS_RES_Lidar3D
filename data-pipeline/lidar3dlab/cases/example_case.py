@@ -22,6 +22,8 @@ class Case:
     params: SequenceSpec
     expected_band: str
     real_or_synthetic: str
+    dataset: str = "Synthetic (CAOS, no third-party data)"   # human-readable data source
+    license: str = "Synthetic - no third-party data"          # surfaced in the App to avoid licensing issues
 
 
 def _real(seq: str, max_frames: int = 96) -> SequenceSpec:
@@ -43,18 +45,22 @@ CASES: list[Case] = [
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk" / "rgb"),
                       n_frames=0, max_frames=120, decimation=2, engine="own-depthpose"),
          "OUR from-scratch depth+pose model (trained on TUM RGB-D, ~0.2 m held-out ATE) reconstructs a desk sweep",
-         "real"),
+         "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
     Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",
          SequenceSpec("kitti_lidar", source_dir=str(DATA_ROOT / "lidar" / "kitti00"), n_frames=0, max_frames=40,
                       modality="lidar"),
          "a folder of .bin/.npy/.ply LiDAR scans; ICP odometry + registered map (bakes offline when the dataset is present)",
-         "real"),
+         "real", dataset="KITTI odometry (Geiger et al. 2012)", license="CC BY-NC-SA 3.0 (KITTI)"),
     Case("oxford", "real: outdoor walk",
-         _real("oxford"), "forward outdoor street; smooth metric trajectory (a few metres)", "real"),
+         _real("oxford"), "forward outdoor street; smooth metric trajectory (a few metres)", "real",
+         dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
     Case("university", "real: courtyard",
-         _real("university"), "courtyard walk; metric trajectory; structured facades", "real"),
+         _real("university"), "courtyard walk; metric trajectory; structured facades", "real",
+         dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
     Case("loop", "real: revisit (loop closure)",
-         _real("loop"), "path that revisits; showcases the drift / loop-closure gap", "real"),
+         _real("loop"), "path that revisits; showcases the drift / loop-closure gap", "real",
+         dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
     Case("courthouse", "real: facade orbit",
-         _real("courthouse"), "facade orbit; metric trajectory around a structure", "real"),
+         _real("courthouse"), "facade orbit; metric trajectory around a structure", "real",
+         dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
 ]

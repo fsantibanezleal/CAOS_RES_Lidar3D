@@ -3,6 +3,12 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.003] · 2026-07-01
+
+### Added (dataset + license transparency, to avoid licensing issues)
+- Every case carries its data source + LICENSE, surfaced in the App Reconstruction stats: Synthetic (CAOS) for
+  the procedural cases, Apache-2.0 (lingbot-map examples), CC BY 4.0 (TUM RGB-D), CC BY-NC-SA 3.0 (KITTI).
+
 ## [0.09.002] · 2026-07-01
 
 ### Added

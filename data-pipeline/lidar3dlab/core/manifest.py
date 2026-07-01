@@ -30,6 +30,8 @@ def build_case_manifest(*, case: Any, params: Any, seed: int, artifact_rel: str,
         "category": case.category,
         "real_or_synthetic": case.real_or_synthetic,
         "expected_band": case.expected_band,
+        "dataset": getattr(case, "dataset", ""),
+        "license": getattr(case, "license", ""),
         "engine": engine,
         "params": {
             "source": _source_label(params),
