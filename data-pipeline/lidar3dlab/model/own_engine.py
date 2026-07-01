@@ -233,7 +233,8 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
     size = int(ck.get("size", 224))
     # backbone comes from the checkpoint; pretrained=False since the ImageNet weights are already baked into it
     model = OwnDepthPose(base=int(ck.get("base", 32)), max_depth=float(ck.get("max_depth", 10.0)),
-                         backbone=str(ck.get("backbone", "scratch")), pretrained=False)
+                         backbone=str(ck.get("backbone", "scratch")), pretrained=False,
+                         pose_head=str(ck.get("pose_head", "siamese")))
     model.load_state_dict(ck["model"])
     model = model.to(device).eval()
     # unproject with the dataset's REAL intrinsics (scaled to the working resolution) for a geometrically consistent
