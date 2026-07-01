@@ -41,7 +41,7 @@ CASES: list[Case] = [
     Case("OWN_tum_desk", "ours: trained depth+pose model (TUM RGB-D)",
          SequenceSpec("OWN_tum_desk",
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk" / "rgb"),
-                      n_frames=0, max_frames=60, decimation=3, engine="own-depthpose"),
+                      n_frames=0, max_frames=60, decimation=2, engine="own-depthpose"),
          "OUR from-scratch depth+pose model (trained on TUM RGB-D, ~0.2 m held-out ATE) reconstructs a desk sweep",
          "real"),
     Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",
