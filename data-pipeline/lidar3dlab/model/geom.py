@@ -57,11 +57,13 @@ def look_at(eye: Array, target: Array, up: Array | None = None) -> Array:
 
 
 def unproject(depth: Array, K: Array, c2w: Array, rgb: Array | None = None, decimate: int = 1,
-              conf: Array | None = None, conf_thr: float | None = None) -> tuple[Array, Array]:
+              conf: Array | None = None, conf_thr: float | None = None,
+              max_depth: float | None = None) -> tuple[Array, Array]:
     """depth (H,W) metric-along-+Z, K (3,3), c2w (3x4 or 4x4) -> (world points [N,3] f32, colors [N,3] u8).
 
     A pixel (u,v) with depth D maps to the camera-frame point ((u-cx)/fx*D, (v-cy)/fy*D, D) and then to the
-    world by the camera-to-world pose. Points with D<=0 or non-finite are dropped. Deterministic."""
+    world by the camera-to-world pose. Points with D<=0, D>=max_depth (far points amplify pose error into scatter),
+    or non-finite are dropped. Deterministic."""
     H, W = depth.shape
     vv, uu = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
     if decimate > 1:
@@ -80,6 +82,8 @@ def unproject(depth: Array, K: Array, c2w: Array, rgb: Array | None = None, deci
     cols = ((rgb.reshape(-1, 3) if rgb is not None else np.full((cam.shape[0], 3), 0.7)) * 255
             ).clip(0, 255).astype(np.uint8)
     keep = np.isfinite(world).all(1) & (depth.reshape(-1) > 1e-6)
+    if max_depth is not None and max_depth > 0:
+        keep &= depth.reshape(-1) < max_depth
     if conf is not None and conf_thr is not None:
         keep &= conf.reshape(-1) >= conf_thr
     return world[keep].astype(np.float32), cols[keep]

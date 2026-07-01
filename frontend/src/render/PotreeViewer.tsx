@@ -8,12 +8,17 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Potree, PointColorType } from 'potree-core';
 import type { Trace } from '../lib/contract.types';
-import type { CameraMode } from './CloudViewer';
+import type { CameraMode, ColorMode } from './CloudViewer';
 
-export function PotreeViewer({ trace, pointSize, dark, density, cameraMode }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; cameraMode: CameraMode }) {
+// map our color toggle to a Potree material color source (RGB baked colors vs a height/elevation ramp).
+// (Potree renders the FULL committed octree at LOD; per-frame replay is a three.js/deck.gl feature by design.)
+const HEIGHT_TYPE = (PointColorType as any).ELEVATION ?? (PointColorType as any).HEIGHT ?? PointColorType.RGB;
+
+export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colorMode }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; cameraMode: CameraMode; colorMode: ColorMode }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
+  const colorRef = useRef(colorMode); colorRef.current = colorMode; // current color for the async load
 
   useEffect(() => {
     const mount = mountRef.current!;
@@ -60,7 +65,7 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode }:
       if (cancelled) { return; }
       pco.material.size = Math.max(0.5, pointSize * 45);
       pco.material.shape = 1;                             // circular points
-      pco.material.pointColorType = PointColorType.RGB;   // use the baked RGB (else it defaults to white/height)
+      pco.material.pointColorType = colorRef.current === 'depth' ? HEIGHT_TYPE : PointColorType.RGB;   // baked RGB / height ramp
       try { (pco.material as any).inputColorEncoding = 1; (pco.material as any).outputColorEncoding = 1; } catch { /* older api */ }
       pco.material.needsUpdate = true;
       a.scene.add(pco); a.pco = pco;
@@ -83,6 +88,13 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode }:
     a.potree.pointBudget = Math.round(3_000_000 / Math.max(1, density));
     if (a.pco) a.pco.material.size = Math.max(0.5, pointSize * 45);
   }, [pointSize, density]);
+
+  // color toggle: baked RGB vs height ramp (responds to the same Color control as the other renderers)
+  useEffect(() => {
+    const a = api.current; if (!a || !a.pco) return;
+    a.pco.material.pointColorType = colorMode === 'depth' ? HEIGHT_TYPE : PointColorType.RGB;
+    a.pco.material.needsUpdate = true;
+  }, [colorMode]);
 
   // top / orbit camera framing (Potree keeps the LOD; first-person is not meaningful for a static octree)
   useEffect(() => {

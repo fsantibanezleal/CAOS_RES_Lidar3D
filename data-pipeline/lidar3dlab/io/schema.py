@@ -26,6 +26,9 @@ class SequenceSpec:
     synthetic: bool = False    # a procedural CPU case (CI-safe; no GPU/model)
     modality: str = "camera"   # "camera" (lingbot / synthetic) or "lidar" (ICP odometry on scans)
     engine: str = ""           # explicit engine name (model-agnostic registry); "" = auto-dispatch by the above
+    frame_glob: str = ""       # glob for the ordered RGB frames when a folder mixes files (e.g. "*.color.png" for 7-Scenes); "" = all png/jpg
+    intrinsics: str = ""       # real camera intrinsics "fx,fy,cx,cy,W,H" (native px) for a correct unprojection; "" = fixed-FoV fallback
+    max_render_depth: float = 0.0  # drop points beyond this depth (m) when accumulating (far points amplify pose error into scatter); 0 = keep all
 
 
 @dataclass(frozen=True)

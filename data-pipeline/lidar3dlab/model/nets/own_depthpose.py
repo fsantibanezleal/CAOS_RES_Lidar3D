@@ -9,6 +9,17 @@ Design: a shared-nothing pair of small convnets.
 
 This is the first honest, trainable own model; the beyond-SOTA recurrent-memory / loop-closure variants extend it
 behind the same forward signature (see wip/lidar3d/beyond-sota-own-stack-plan.md).
+
+Two interchangeable backbones behind ONE forward signature (`backbone=` in OwnDepthPose):
+  - "scratch"  : the from-scratch UNet encoder + a small pose convnet (DepthNet + PoseNet below). Zero external
+                 weights; the honest "desde cero" baseline.
+  - "resnet18" : a torchvision ResNet-18 encoder pretrained on ImageNet, SHARED by the depth decoder and a Siamese
+                 pose head. The backbone is a generic vision feature extractor (NOT a third-party reconstruction
+                 product); the depth decoder, the aleatoric confidence head, the Siamese pose head, the se(3)
+                 exponential and the whole training loop remain ours. This is the quality-oriented variant: a
+                 pretrained encoder gives much sharper, more consistent depth and steadier pose than 2.2 M params
+                 learned from scratch on a few thousand pairs.
+Every experiment (backbone, data, ATE) is logged in docs/experiments and MODEL_HISTORY so nothing is lost.
 """
 from __future__ import annotations
 
@@ -19,6 +30,10 @@ from torch import nn
 
 def conv(ci: int, co: int, k: int = 3, s: int = 1) -> nn.Sequential:
     return nn.Sequential(nn.Conv2d(ci, co, k, s, k // 2), nn.GroupNorm(min(8, co), co), nn.GELU())
+
+
+def _up(x: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    return F.interpolate(x, size=ref.shape[-2:], mode="bilinear", align_corners=False)
 
 
 class DepthNet(nn.Module):
@@ -87,15 +102,99 @@ def se3_exp(xi: torch.Tensor) -> torch.Tensor:
     return T
 
 
-class OwnDepthPose(nn.Module):
-    """The full model: per-frame depth+conf and pairwise relative pose."""
+class PretrainedEncoder(nn.Module):
+    """ResNet-18 (ImageNet) multi-scale feature extractor. A GENERIC vision backbone, not a third-party
+    reconstruction product: only the convolutional features are reused; the depth decoder, the aleatoric head,
+    the Siamese pose head and the training loop are ours. Returns features at /2, /4, /8, /16, /32."""
 
-    def __init__(self, base: int = 32, max_depth: float = 10.0):
+    out_ch = (64, 64, 128, 256, 512)
+
+    def __init__(self, pretrained: bool = True):
         super().__init__()
-        self.depth = DepthNet(base, max_depth)
-        self.pose = PoseNet()
+        from torchvision.models import ResNet18_Weights, resnet18
+        w = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+        m = resnet18(weights=w)
+        self.stem = nn.Sequential(m.conv1, m.bn1, m.relu)      # /2, 64
+        self.maxpool = m.maxpool
+        self.layer1, self.layer2, self.layer3, self.layer4 = m.layer1, m.layer2, m.layer3, m.layer4
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+
+    def forward(self, rgb: torch.Tensor) -> list[torch.Tensor]:
+        x = (rgb - self.mean) / self.std                      # ImageNet normalisation
+        x1 = self.stem(x)
+        x2 = self.layer1(self.maxpool(x1))                    # /4, 64
+        x3 = self.layer2(x2)                                  # /8, 128
+        x4 = self.layer3(x3)                                  # /16, 256
+        x5 = self.layer4(x4)                                  # /32, 512
+        return [x1, x2, x3, x4, x5]
+
+
+class DepthDecoder(nn.Module):
+    """Our UNet decoder over the pretrained features: metric depth (sigmoid) + aleatoric log-variance, upsampled
+    to the input resolution. Same aleatoric-confidence contract as the from-scratch DepthNet."""
+
+    def __init__(self, enc_ch: tuple[int, ...] = PretrainedEncoder.out_ch, base: int = 32, max_depth: float = 10.0):
+        super().__init__()
+        self.max_depth = max_depth
+        c1, c2, c3, c4, c5 = enc_ch
+        self.d4 = nn.Sequential(conv(c5 + c4, base * 4), conv(base * 4, base * 4))
+        self.d3 = nn.Sequential(conv(base * 4 + c3, base * 2), conv(base * 2, base * 2))
+        self.d2 = nn.Sequential(conv(base * 2 + c2, base), conv(base, base))
+        self.d1 = nn.Sequential(conv(base + c1, base), conv(base, base))
+        self.head = nn.Conv2d(base, 2, 1)
+
+    def forward(self, feats: list[torch.Tensor], out_hw: tuple[int, int]) -> tuple[torch.Tensor, torch.Tensor]:
+        x1, x2, x3, x4, x5 = feats
+        y4 = self.d4(torch.cat([_up(x5, x4), x4], 1))
+        y3 = self.d3(torch.cat([_up(y4, x3), x3], 1))
+        y2 = self.d2(torch.cat([_up(y3, x2), x2], 1))
+        y1 = self.d1(torch.cat([_up(y2, x1), x1], 1))
+        h = self.head(F.interpolate(y1, size=out_hw, mode="bilinear", align_corners=False))
+        depth = self.max_depth * torch.sigmoid(h[:, :1])
+        logvar = h[:, 1:].clamp(-8, 8)
+        return depth, logvar
+
+
+class SiamesePoseHead(nn.Module):
+    """Regresses a 6-DoF se(3) tangent from the globally-pooled encoder features of the two frames (shared
+    encoder = Siamese). Small MLP, zero-initialised last layer so it starts at identity motion."""
+
+    def __init__(self, feat: int = 512):
+        super().__init__()
+        self.mlp = nn.Sequential(nn.Linear(feat * 2, 256), nn.GELU(), nn.Linear(256, 128), nn.GELU(),
+                                 nn.Linear(128, 6))
+        self.mlp[-1].weight.data.mul_(0.01)
+        self.mlp[-1].bias.data.zero_()
+
+    def forward(self, g0: torch.Tensor, g1: torch.Tensor) -> torch.Tensor:
+        return self.mlp(torch.cat([g0, g1], 1))
+
+
+class OwnDepthPose(nn.Module):
+    """The full model: per-frame depth+conf and pairwise relative pose. Two interchangeable backbones behind one
+    forward signature: "scratch" (DepthNet + PoseNet, zero external weights) or "resnet18" (ImageNet encoder
+    shared by DepthDecoder + SiamesePoseHead). Everything but the ResNet features is ours."""
+
+    def __init__(self, base: int = 32, max_depth: float = 10.0, backbone: str = "scratch",
+                 pretrained: bool = True):
+        super().__init__()
+        self.backbone = backbone
+        if backbone == "resnet18":
+            self.enc = PretrainedEncoder(pretrained=pretrained)
+            self.dec = DepthDecoder(self.enc.out_ch, base, max_depth)
+            self.posehead = SiamesePoseHead(self.enc.out_ch[-1])
+        else:
+            self.depth = DepthNet(base, max_depth)
+            self.pose = PoseNet()
 
     def forward(self, rgb0: torch.Tensor, rgb1: torch.Tensor) -> dict:
-        depth0, logvar0 = self.depth(rgb0)
-        xi = self.pose(rgb0, rgb1)
+        if self.backbone == "resnet18":
+            f0 = self.enc(rgb0)
+            f1 = self.enc(rgb1)
+            depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
+            xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
+        else:
+            depth0, logvar0 = self.depth(rgb0)
+            xi = self.pose(rgb0, rgb1)
         return {"depth0": depth0, "logvar0": logvar0, "xi": xi, "rel_pose": se3_exp(xi)}

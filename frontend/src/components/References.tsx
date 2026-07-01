@@ -30,6 +30,9 @@ export const REFS: Ref[] = [
   { key: 'tum', authors: 'Sturm et al.', title: 'A Benchmark for the Evaluation of RGB-D SLAM Systems (TUM RGB-D)', venue: 'IROS', year: '2012', url: 'https://cvg.cit.tum.de/data/datasets/rgbd-dataset' },
   { key: 'rope', authors: 'Su et al.', title: 'RoFormer: Enhanced Transformer with Rotary Position Embedding', venue: 'arXiv:2104.09864', year: '2021', url: 'https://arxiv.org/abs/2104.09864' },
   { key: 'flashinfer', authors: 'Ye et al.', title: 'FlashInfer: Efficient Attention Engine for LLM Serving', venue: 'arXiv:2501.01005', year: '2025', url: 'https://arxiv.org/abs/2501.01005' },
+  { key: 'iclnuim', authors: 'Handa et al.', title: 'A Benchmark for RGB-D Visual Odometry, 3D Reconstruction and SLAM (ICL-NUIM)', venue: 'ICRA', year: '2014', url: 'https://www.doc.ic.ac.uk/~ahanda/VaFRIC/iclnuim.html' },
+  { key: 'resnet', authors: 'He et al.', title: 'Deep Residual Learning for Image Recognition', venue: 'CVPR (arXiv:1512.03385)', year: '2016', url: 'https://arxiv.org/abs/1512.03385' },
+  { key: 'umeyama', authors: 'Umeyama', title: 'Least-squares estimation of transformation parameters between two point patterns', venue: 'IEEE TPAMI', year: '1991', url: 'https://ieeexplore.ieee.org/document/88573' },
 ];
 
 const BY_KEY: Record<string, Ref> = Object.fromEntries(REFS.map((r) => [r.key, r]));

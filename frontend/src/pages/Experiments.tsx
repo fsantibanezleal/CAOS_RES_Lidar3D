@@ -1,9 +1,40 @@
 import { type Lang } from '../i18n';
 import { SubTabs } from '../components/SubTabs';
 import { Cite, Refs } from '../components/References';
+import { MODEL_HISTORY } from '../data/model_history';
+
+const DEPLOY_LABEL: Record<string, [string, string]> = {
+  live: ['LIVE', 'EN VIVO'], 'yes-superseded': ['deployed (superseded)', 'desplegado (reemplazado)'],
+  no: ['not deployed', 'no desplegado'], pending: ['pending verify', 'pendiente verificar'],
+};
 
 export function Experiments({ lang }: { lang: Lang }) {
   const en = lang === 'en';
+
+  const models = (
+    <>
+      <h3>{en ? 'Model history (every experiment, nothing lost)' : 'Historial de modelos (cada experimento, sin perder nada)'}</h3>
+      <p>{en
+        ? 'The complete, honest record of every model trained for the OUR engine: backbone, data, held-out ATE (RMS trajectory error in metres on TUM long-office, Umeyama-aligned; lower is better), whether it was deployed, and every negative result. Kept in sync with the repo docs and the append-only experiments log.'
+        : 'El registro completo y honesto de cada modelo entrenado para el motor OUR: backbone, datos, ATE held-out (error RMS de trayectoria en metros en TUM long-office, alineado con Umeyama; menor es mejor), si se desplegó, y cada resultado negativo. Sincronizado con los docs del repo y el log append-only de experimentos.'}</p>
+      <table className="data"><thead>
+        <tr><th>#</th><th>{en ? 'Run' : 'Corrida'}</th><th>Backbone</th><th>{en ? 'Data' : 'Datos'}</th><th>ATE (m)</th><th>{en ? 'Deployed' : 'Desplegado'}</th><th>{en ? 'Notes' : 'Notas'}</th></tr>
+      </thead><tbody>
+        {MODEL_HISTORY.map((m) => (
+          <tr key={m.id}>
+            <td>{m.id}</td><td>{m.run}</td>
+            <td><span className="tag">{m.backbone}</span></td>
+            <td>{m.data}</td><td>{m.ate}</td>
+            <td><span className={'tag' + (m.deployed === 'live' ? ' on' : '')}>{(DEPLOY_LABEL[m.deployed] || ['', ''])[en ? 0 : 1]}</span></td>
+            <td className="muted">{en ? m.notes_en : m.notes_es}</td>
+          </tr>
+        ))}
+      </tbody></table>
+      <p className="muted">{en
+        ? 'The diffuse-vs-sharp look is dominated by pose drift, not depth noise: the per-frame depth is already coherent. Best-checkpoint early stopping helped (M2→M4), extra losses hurt (M5), and the pretrained backbone (M7) is the chosen lever, a stronger encoder plus a steadier Siamese pose head attack the drift directly. Deploy is gated on a verified screenshot comparison, never the ATE number alone.'
+        : 'El aspecto difuso-vs-nítido lo domina el drift de pose, no el ruido de depth: la profundidad por cuadro ya es coherente. El early-stopping por mejor checkpoint ayudó (M2→M4), las pérdidas extra dañaron (M5), y el backbone preentrenado (M7) es el lever elegido: un encoder más fuerte más una cabeza de pose Siamese más estable atacan el drift directamente. El despliegue se decide por comparación visual verificada, nunca por el número de ATE solo.'}</p>
+    </>
+  );
 
   const cases = (
     <>
@@ -64,6 +95,7 @@ export function Experiments({ lang }: { lang: Lang }) {
         : 'Los casos cubren categorías: un control sintético CPU (el smoke de CI), el motor LiDAR y secuencias reales de cámara horneadas offline en una GPU de 8 GB. Esta página también expone la agenda novel evaluada más allá del motor SOTA.'}</p>
       <SubTabs tabs={[
         { id: 'cases', label: en ? 'Cases' : 'Casos', body: <>{cases}<Refs ids={['kissicp', 'kitti']} /></> },
+        { id: 'models', label: en ? 'Model history' : 'Historial de modelos', body: <>{models}<Refs ids={['tum', 'iclnuim', 'resnet', 'umeyama']} /></> },
         { id: 'config', label: en ? '8 GB config' : 'Config 8 GB', body: <>{config}<Refs ids={['flashinfer', 'lingbot']} /></> },
         { id: 'novel', label: en ? 'Novel agenda' : 'Agenda novel', body: <>{novel}<Refs ids={['oxfordspires', 'kissicp', 'mapanything', 'dinov3']} /></> },
         { id: 'honesty', label: en ? 'Honesty' : 'Honestidad', body: honesty },

@@ -26,6 +26,10 @@ an instance of the CAOS product-repo archetype (ADR-0057), deploying as a static
   reconstruction formalized, the [Geometric Context Transformer](theory/02_geometric-context-transformer.md)
   in full (backbone, alternating attention, the three contexts, the paged KV cache, the metric-scale anchor),
   pointmaps + the depth-to-world geometry, LiDAR odometry, the SOTA lineage, and the novel agenda beyond SOTA.
+- **[models/](models.md)**: our OWN trainable depth+pose model in full (the scratch UNet and the pretrained
+  ResNet-18 backbones, the aleatoric depth head, the Siamese pose head, the se(3) exponential, the losses, the ATE
+  metric), plus the complete [model history](models/02_model-history.md) (every experiment, every negative result,
+  what was deployed) and the append-only [experiments log](models/03_experiments-log.md). Nothing is lost.
 
 ## Honesty + data policy
 

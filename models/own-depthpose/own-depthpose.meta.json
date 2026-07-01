@@ -1,0 +1,1 @@
+{"backbone": "resnet18", "val_ate": 0.3729, "size": 224, "base": 32, "use_icl": true}

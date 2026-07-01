@@ -108,5 +108,7 @@ def validate_rows(raw_rows: list[dict[str, Any]]) -> ContractReport:
             kv_window=int(row.get("kv_window", 16)), scale_frames=int(row.get("scale_frames", 8)),
             camera_iters=int(row.get("camera_iters", 1)), synthetic=synthetic,
             modality=str(row.get("modality", "camera")), engine=str(row.get("engine", "")),
+            frame_glob=str(row.get("frame_glob", "")), intrinsics=str(row.get("intrinsics", "")),
+            max_render_depth=float(row.get("max_render_depth", 0.0) or 0.0),
         ))
     return ContractReport(accepted=accepted, rejected=rejected, flagged=flagged)

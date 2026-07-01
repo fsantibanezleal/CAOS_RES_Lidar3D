@@ -44,6 +44,10 @@ data/raw/
 # large trained models stay local/LFS; commit small ONNX explicitly with `git add -f` if needed
 models/*.pt
 models/*.pth
+models/**/*.pt
+models/**/*.pth
+# but DO version the small append-only experiment ledger (training history, never lost)
+!models/**/experiments.jsonl
 *.dll
 *.so
 *.dylib

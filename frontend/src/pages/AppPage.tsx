@@ -135,11 +135,18 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         {trace && (renderer === 'deck'
           ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />
           : renderer === 'potree'
-            ? <PotreeViewer key={trace.case_id} trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} cameraMode={camMode} />
+            ? <PotreeViewer key={trace.case_id} trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} cameraMode={camMode} colorMode={colorMode} />
             : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>
+        {renderer === 'potree' && (
+          <div className="overlay" style={{ top: 'auto', bottom: 8, right: 8, left: 'auto', maxWidth: 320, opacity: 0.85 }}>
+            {es(lang)
+              ? 'Potree renderiza el MAPA COMPLETO por LOD (octree, escala a millones). El replay por cuadros, conos y trayectoria son de three.js / deck.gl; aquí responden densidad, tamaño y color.'
+              : 'Potree renders the FULL map by LOD (octree, scales to millions). Frame replay, cones and trajectory live in three.js / deck.gl; here density, size and color apply.'}
+          </div>
+        )}
       </section>
 
       <aside className="panel">

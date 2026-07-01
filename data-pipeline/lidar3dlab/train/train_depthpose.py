@@ -18,7 +18,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from ..model.nets.own_depthpose import OwnDepthPose
-from .dataset_tum import TUMPairs, list_sequences
+from .dataset_tum import ICLPairs, TUMPairs, icl_sequences, list_sequences
 
 
 def depth_loss(pred: torch.Tensor, logvar: torch.Tensor, gt: torch.Tensor, max_depth: float) -> torch.Tensor:
@@ -77,6 +77,18 @@ def photometric_loss(rgb0: torch.Tensor, rgb1: torch.Tensor, depth0: torch.Tenso
     return (per * v).sum() / v.sum().clamp(min=1.0)
 
 
+def smoothness_loss(depth: torch.Tensor, rgb: torch.Tensor) -> torch.Tensor:
+    """Edge-aware depth smoothness (Monodepth2-style): penalize depth gradients, down-weighted where the image
+    has edges. Makes the depth (and thus the point cloud) cleaner / less noisy."""
+    d = depth / (depth.mean(dim=[2, 3], keepdim=True) + 1e-6)
+    dx = (d[:, :, :, :-1] - d[:, :, :, 1:]).abs()
+    dy = (d[:, :, :-1, :] - d[:, :, 1:, :]).abs()
+    g = rgb.mean(1, keepdim=True)
+    wx = torch.exp(-(g[:, :, :, :-1] - g[:, :, :, 1:]).abs() * 10)
+    wy = torch.exp(-(g[:, :, :-1, :] - g[:, :, 1:, :]).abs() * 10)
+    return (dx * wx).mean() + (dy * wy).mean()
+
+
 def umeyama_ate(pred_c: np.ndarray, gt_c: np.ndarray) -> float:
     """RMS ATE after a rigid (R,t) alignment of the predicted trajectory to the GT (no scale)."""
     mp, mg = pred_c.mean(0), gt_c.mean(0)
@@ -112,6 +124,16 @@ def evaluate(model: OwnDepthPose, seq_dir: str, device: torch.device, size: int,
     return umeyama_ate(pred_c[:n], gt_c[:n])
 
 
+def _log_experiment(out_dir: Path, rec: dict) -> None:
+    """Append one training epoch's result to models/own-depthpose/experiments.jsonl so the full history of every
+    model/experiment is preserved (fed into docs/experiments + the web Experiments page). Never truncates."""
+    import datetime
+    import json
+    rec = {"ts": datetime.datetime.now().isoformat(timespec="seconds"), **rec}
+    with open(out_dir / "experiments.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--epochs", type=int, default=2)
@@ -121,6 +143,10 @@ def main() -> None:
     ap.add_argument("--max_pairs", type=int, default=None, help="cap pairs per sequence (smoke test)")
     ap.add_argument("--photo_w", type=float, default=0.0, help="self-supervised photometric loss weight (0=off)")
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
+    ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
+    ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
+    ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
+                    help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -133,11 +159,15 @@ def main() -> None:
     val_seq = seqs[-1]
     train_seqs = seqs[:-1] or seqs
     mp = args.max_pairs if not args.smoke else 4
-    train = ConcatDataset([TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs])
+    datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
+    if args.use_icl:
+        datasets += [ICLPairs(s, image_size=args.size, max_pairs=mp) for s in icl_sequences()]
+    train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
-    model = OwnDepthPose(base=args.base, max_depth=10.0).to(device)
+    model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
           f"params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
@@ -161,9 +191,13 @@ def main() -> None:
                 if args.photo_w > 0:
                     loss = loss + args.photo_w * photometric_loss(
                         r0.float(), r1.float(), out["depth0"].float(), out["rel_pose"].float(), Kb)
+                if args.smooth_w > 0:
+                    loss = loss + args.smooth_w * smoothness_loss(out["depth0"].float(), r0.float())
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
+            if not args.smoke:
+                sched.step()
             steps += 1
             if steps % 20 == 0 or args.smoke:
                 print(f"ep{ep} step{steps} loss={loss.item():.4f} depth={ld.item():.4f} pose={lp.item():.4f}")
@@ -174,10 +208,22 @@ def main() -> None:
         ate = evaluate(model, val_seq, device, args.size, max_pairs=300)
         improved = ate < best_ate
         print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
+        n_params = sum(p.numel() for p in model.parameters())
+        _log_experiment(out_dir, {                     # append every epoch so NO experiment is ever lost
+            "backbone": args.backbone, "epoch": ep, "val_ate": round(ate, 4), "best_ate": round(min(ate, best_ate), 4),
+            "is_best": improved, "params_M": round(n_params / 1e6, 3), "base": args.base, "size": args.size,
+            "lr": args.lr, "use_icl": args.use_icl, "train_pairs": len(train), "val_seq": os.path.basename(val_seq),
+        })
         if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
             best_ate = ate
-            torch.save({"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base, "val_ate": ate},
-                       out_dir / "own-depthpose.pt")
+            ckpt = {"model": model.state_dict(), "max_depth": 10.0, "size": args.size, "base": args.base,
+                    "backbone": args.backbone, "val_ate": ate}
+            torch.save(ckpt, out_dir / f"own-depthpose-{args.backbone}.pt")   # per-backbone archive (never clobbered)
+            torch.save(ckpt, out_dir / "own-depthpose.pt")                    # canonical file the engine loads
+            import json as _json
+            (out_dir / "own-depthpose.meta.json").write_text(_json.dumps({    # small sidecar for accurate engine labels
+                "backbone": args.backbone, "val_ate": round(ate, 4), "size": args.size,
+                "base": args.base, "use_icl": args.use_icl}))
 
     if args.smoke:
         print("SMOKE OK")

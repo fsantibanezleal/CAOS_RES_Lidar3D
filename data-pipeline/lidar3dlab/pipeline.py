@@ -24,11 +24,29 @@ MANIFESTS = DERIVED / "manifests"
 STAGES = ("preprocess", "feature_extraction", "train", "infer", "refine", "evaluate", "export")
 
 
+def _own_model_label() -> str:
+    """Human label for the OUR engine, read from the checkpoint's meta sidecar so it always reflects the ACTUAL
+    trained model (backbone + data + held-out ATE), not a hard-coded string."""
+    import json
+    from .config import MODELS_ROOT
+    meta_p = MODELS_ROOT / "own-depthpose" / "own-depthpose.meta.json"
+    try:
+        m = json.loads(meta_p.read_text())
+        bb = "pretrained ResNet-18 backbone" if m.get("backbone") == "resnet18" else "from-scratch UNet"
+        data = "TUM RGB-D + ICL-NUIM" if m.get("use_icl") else "TUM RGB-D"
+        ate = f", {m['val_ate']:.2f} m held-out ATE" if m.get("val_ate") else ""
+        return f"OUR depth+pose net ({bb} + our decoder/pose, trained on {data}{ate})"
+    except Exception:  # noqa: BLE001
+        return "OUR depth+pose net (our decoder/pose, trained on TUM RGB-D)"
+
+
 def _row(spec) -> dict:
     return {"case_id": spec.case_id, "source_dir": spec.source_dir, "max_frames": spec.max_frames,
             "image_size": spec.image_size, "decimation": spec.decimation, "conf_quantile": spec.conf_quantile,
             "synthetic": spec.synthetic, "kv_window": spec.kv_window, "scale_frames": spec.scale_frames,
-            "camera_iters": spec.camera_iters, "modality": spec.modality, "engine": spec.engine}
+            "camera_iters": spec.camera_iters, "modality": spec.modality, "engine": spec.engine,
+            "frame_glob": spec.frame_glob, "intrinsics": spec.intrinsics,
+            "max_render_depth": spec.max_render_depth}
 
 
 def precompute(case_id: str, seed: int = 42) -> dict:
@@ -49,7 +67,7 @@ def precompute(case_id: str, seed: int = 42) -> dict:
     run_ms = (time.perf_counter() - t0) * 1000.0
 
     if spec.engine == "own-depthpose":
-        model = "OUR depth+pose net (from scratch, trained on TUM RGB-D)"
+        model = _own_model_label()
     elif spec.modality == "lidar":
         model = "open3d point-to-plane ICP" + (" (synthetic scans)" if spec.synthetic else " (real LiDAR scans)")
     elif spec.synthetic:
