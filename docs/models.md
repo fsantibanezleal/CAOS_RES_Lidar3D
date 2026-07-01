@@ -10,6 +10,7 @@ into it and the history of training them, so no experiment or negative result is
 | 01 | [The own depth+pose model](models/01_own-depth-pose.md) | our from-scratch depth+pose network in full: the two interchangeable backbones (scratch UNet / pretrained ResNet-18), the aleatoric depth head, the Siamese pose head, the se(3) exponential, the losses, the ATE metric |
 | 02 | [Model history](models/02_model-history.md) | the complete chronological record of every model/experiment: backbone, data, held-out ATE, points, what was deployed, and every negative result, so the history is preserved |
 | 03 | [Experiments log](models/03_experiments-log.md) | the machine-readable `experiments.jsonl` schema (one row per training epoch, never truncated), how to read it, and how the web Experiments page renders it |
+| 04 | [Datasets](models/04_datasets.md) | the model data: training datasets (TUM x11, ICL-NUIM, 7-Scenes), formats, the real per-dataset intrinsics, licenses, and the bigger-data roadmap |
 
 ## Where the models live
 
