@@ -84,7 +84,7 @@ export interface CaseManifest {
   expected_band: string;
   engine: EngineInfo;
   params: {
-    source: string; // a label ("synthetic" or a sequence name) — never an absolute path
+    source: string; // a label ("synthetic" or a sequence name), never an absolute path
     n_frames: number;
     max_frames: number;
     image_size: number;

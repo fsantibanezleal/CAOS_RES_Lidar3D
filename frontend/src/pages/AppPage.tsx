@@ -114,8 +114,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
               <tr><td>{t(lang, 'engine')}</td><td>{manifest.engine.model}</td></tr>
               <tr><td>{t(lang, 'category')}</td><td>{manifest.category}</td></tr>
               <tr><td>{t(lang, 'frames')}</td><td>{manifest.params.max_frames}</td></tr>
-              <tr><td>{t(lang, 'points')}</td><td>{trace ? trace.n_points.toLocaleString() : '—'}</td></tr>
-              <tr><td>{t(lang, 'path')}</td><td>{trace ? `${trace.path_length} m` : '—'}</td></tr>
+              <tr><td>{t(lang, 'points')}</td><td>{trace ? trace.n_points.toLocaleString() : '·'}</td></tr>
+              <tr><td>{t(lang, 'path')}</td><td>{trace ? `${trace.path_length} m` : '·'}</td></tr>
               <tr><td>{t(lang, 'lane')}</td><td>{manifest.lane}</td></tr>
               <tr><td>{t(lang, 'refine')}</td><td>{manifest.refine?.refined ? 'cleaned (open3d)' : 'colored cloud'}</td></tr>
             </tbody></table>
@@ -139,7 +139,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
             <input type="range" min={0} max={thumbs.length - 1} step={1} value={ti} onChange={(e) => setThumb(+e.target.value)} />
             <p className="hint">frame {thumbs[ti].idx}</p>
           </>
-        ) : <p className="hint">—</p>}
+        ) : <p className="hint">·</p>}
       </aside>
     </div>
   );

@@ -29,6 +29,12 @@ nav.app button.on { color: var(--txt); background: var(--panel); border-color: v
 .hbtns a, .hbtns button { color: var(--mut); background: transparent; border: 1px solid var(--line);
   border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
 .hbtns a:hover, .hbtns button:hover { border-color: var(--acc2); color: var(--txt); }
+.hbtns svg { display: block; }
+.hbtns .ic-txt { gap: 6px; }
+.ver { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 6px;
+  padding: 1px 6px; font-weight: 500; font-variant-numeric: tabular-nums; vertical-align: middle; }
+.brand h1 .ver { margin-left: 4px; }
+footer.app .ver { color: var(--acc); border-color: var(--line); }
 
 main.app { flex: 1; min-height: 0; }
 .page { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
@@ -38,6 +44,32 @@ main.app { flex: 1; min-height: 0; }
 .page .lead { color: var(--mut); font-size: 15px; max-width: 70ch; }
 .page code { background: var(--bg2); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
 .katex-block { margin: 12px 0; overflow-x: auto; }
+
+/* per-page sub-tabs */
+.subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 4px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.stab { background: var(--bg2); border: 1px solid var(--line); color: var(--mut); padding: 6px 13px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px; }
+.stab:hover { color: var(--txt); border-color: var(--acc2); }
+.stab.on { color: var(--txt); background: var(--panel); border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
+.subtab-body { margin-top: 6px; }
+.subtab-body h3:first-child { margin-top: 12px; }
+
+/* references + inline citations */
+.reflist { color: var(--mut); font-size: 13px; line-height: 1.7; padding-left: 24px; }
+.reflist li { margin: 3px 0; }
+.reflist a { color: var(--acc2); }
+.muted { color: var(--mut); }
+.cite { color: var(--acc2); font-size: 0.72em; font-weight: 600; padding-left: 1px; }
+
+/* data tables (benchmark / results-per-model) */
+table.data { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.data th { color: var(--acc2); font-weight: 600; border-bottom: 1.5px solid var(--line); }
+table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data tr:hover td { background: var(--bg2); }
+.tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--mut); white-space: nowrap; }
+.tag.classical { border-color: var(--acc2); color: var(--acc2); }
+.tag.sota { border-color: var(--acc); color: var(--acc); }
+.tag.novel { border-color: var(--warn); color: var(--warn); }
 .refs { color: var(--mut); font-size: 13px; }
 .tag { display: inline-block; background: var(--bg2); border: 1px solid var(--line); color: var(--mut);
   border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
@@ -78,5 +110,7 @@ footer.app a { color: var(--mut); }
 .card-h { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .card-b { padding: 18px; }
 .diagram { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 14px; color: var(--acc2); font-size: 12px; overflow-x: auto; white-space: pre; }
+.svgwrap { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 14px 0; overflow-x: auto; }
+.svgwrap svg { display: block; min-width: 560px; }
 
 @media (max-width: 1000px) { .work { grid-template-columns: 1fr; height: auto; } .stage { min-height: 56vh; } }

@@ -1,5 +1,5 @@
 // Fetch the committed artifacts (copied into public/data by copy-data.mjs). Works against the static site OR,
-// if app/ is activated, you can repoint these to the API — same shapes (CONTRACT 2).
+// if app/ is activated, you can repoint these to the API (same shapes, CONTRACT 2).
 import type { CaseIndex, CaseManifest, Trace } from '../lib/contract.types';
 
 const base = import.meta.env.BASE_URL;
