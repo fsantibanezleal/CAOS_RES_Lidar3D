@@ -17,7 +17,9 @@ export function Benchmark({ lang }: { lang: Lang }) {
         <tr><td>Open3D point-to-plane ICP <Cite k="open3d" /></td><td><span className="tag classical">{en ? 'classical' : 'clásico'}</span></td><td>{en ? 'LiDAR frame-to-frame odometry baseline' : 'odometría LiDAR cuadro-a-cuadro (base)'}</td><td>{en ? 'wired (LiDAR cases)' : 'integrado (casos LiDAR)'}</td></tr>
         <tr><td>KISS-ICP <Cite k="kissicp" /></td><td><span className="tag classical">{en ? 'classical' : 'clásico'}</span></td><td>{en ? 'SOTA LiDAR-only odometry' : 'odometría LiDAR-only SOTA'}</td><td>{en ? 'pinned, swappable' : 'fijado, intercambiable'}</td></tr>
         <tr><td>lingbot-map GCT <Cite k="lingbot" /></td><td><span className="tag sota">SOTA</span></td><td>{en ? 'camera streaming reconstruction' : 'reconstrucción de cámara en streaming'}</td><td>{en ? 'wired (camera cases)' : 'integrado (casos cámara)'}</td></tr>
-        <tr><td>{en ? 'Loop-closure head (D1)' : 'Cabeza loop-closure (D1)'}</td><td><span className="tag novel">novel</span></td><td>{en ? 'retrieval + pose-graph on the frozen GCT memory' : 'retrieval + pose-graph sobre la memoria GCT congelada'}</td><td>{en ? 'proposed (Experiments)' : 'propuesto (Experimentos)'}</td></tr>
+        <tr><td><b>{en ? 'OUR depth+pose net' : 'NUESTRA red profundidad+pose'}</b> <Cite k="resnet" /></td><td><span className="tag novel">{en ? 'ours' : 'nuestro'}</span></td><td>{en ? 'trainable ResNet-18 depth + Siamese/correlation pose + ICP/TSDF refinement' : 'ResNet-18 entrenable de profundidad + pose Siamese/correlación + refinado ICP/TSDF'}</td><td>{en ? 'wired + LIVE (8 scenes, ~0.37 m held-out ATE)' : 'integrado + EN VIVO (8 escenas, ~0.37 m ATE held-out)'}</td></tr>
+        <tr><td>{en ? 'Global pose-graph + loop closure (D1)' : 'Pose-graph global + loop closure (D1)'}</td><td><span className="tag novel">novel</span></td><td>{en ? 'Open3D multiway odometry + loop-closure edges, global optimization' : 'odometría multiway Open3D + aristas de loop-closure, optimización global'}</td><td>{en ? 'IMPLEMENTED (opt-in; pose-accuracy bound)' : 'IMPLEMENTADO (opt-in; acotado por precisión de pose)'}</td></tr>
+        <tr><td>{en ? 'TSDF volumetric fusion' : 'Fusión volumétrica TSDF'}</td><td><span className="tag novel">{en ? 'ours' : 'nuestro'}</span></td><td>{en ? 'KinectFusion-style denoised surface from the depth+pose stream' : 'superficie denoised estilo KinectFusion desde el stream profundidad+pose'}</td><td>{en ? 'IMPLEMENTED (opt-in)' : 'IMPLEMENTADO (opt-in)'}</td></tr>
         <tr><td>{en ? 'Camera + LiDAR fusion (D2)' : 'Fusión cámara + LiDAR (D2)'}</td><td><span className="tag novel">novel</span></td><td>{en ? 'metric anchoring + drift correction' : 'anclaje métrico + corrección de drift'}</td><td>{en ? 'proposed' : 'propuesto'}</td></tr>
         <tr><td>{en ? 'Constant-memory recurrence (D3)' : 'Recurrencia de memoria constante (D3)'}</td><td><span className="tag novel">novel</span></td><td>{en ? 'test-time training / LaCT O(1) state' : 'test-time training / estado LaCT O(1)'}</td><td>{en ? 'proposed' : 'propuesto'}</td></tr>
       </tbody></table>
@@ -62,6 +64,18 @@ export function Benchmark({ lang }: { lang: Lang }) {
         <tr><td>LID_synthetic <span className="tag">{en ? 'synthetic, CPU' : 'sintético, CPU'}</span></td><td>Open3D ICP</td><td className="num">72k</td><td className="num">30</td><td className="num">5.01 m</td></tr>
       </tbody></table>
       <p className="muted">{en ? 'Peak VRAM ~7.1 GB on the real camera case; artifact size ~2 to 3 MB per case (decimated, base64). These are engineering measurements, not accuracy claims.' : 'VRAM pico ~7.1 GB en el caso real de cámara; tamaño de artefacto ~2 a 3 MB por caso (decimado, base64). Son mediciones de ingeniería, no afirmaciones de precisión.'}</p>
+
+      <h3>{en ? 'Our own model: 8 scenes + a real held-out ATE' : 'Nuestro modelo: 8 escenas + un ATE held-out real'}</h3>
+      <p className="hint">{en ? 'The OWN depth+pose model has a REAL accuracy number, unlike the vendored engine on the un-GT-ed example clips: an Absolute Trajectory Error measured against ground truth on a truly held-out sequence.' : 'El modelo OWN tiene un número de precisión REAL, a diferencia del motor vendorizado sobre los clips sin GT: un Error Absoluto de Trayectoria medido contra referencia en una secuencia realmente held-out.'}<Cite k="tum" /><Cite k="umeyama" /></p>
+      <table className="data"><thead>
+        <tr><th>{en ? 'Metric' : 'Métrica'}</th><th className="num">{en ? 'Value' : 'Valor'}</th></tr>
+      </thead><tbody>
+        <tr><td>{en ? 'Held-out ATE (TUM long_office, ~300 frames, Umeyama-aligned)' : 'ATE held-out (TUM long_office, ~300 cuadros, alineado Umeyama)'}</td><td className="num"><b>~0.37 m</b></td></tr>
+        <tr><td>{en ? 'Training data' : 'Datos de entrenamiento'}</td><td className="num">{en ? '11 TUM RGB-D seq + ICL-NUIM (~16k pairs)' : '11 seq TUM RGB-D + ICL-NUIM (~16k pares)'}</td></tr>
+        <tr><td>{en ? 'Deployed scenes' : 'Escenas desplegadas'}</td><td className="num">{en ? '8 (4 truly held-out), 240 frames each' : '8 (4 realmente held-out), 240 cuadros c/u'}</td></tr>
+        <tr><td>{en ? 'Fused cloud points (per scene)' : 'Puntos de nube fusionada (por escena)'}</td><td className="num">{en ? '~10k to 117k (ICP-refined + voxel)' : '~10k a 117k (ICP + vóxel)'}</td></tr>
+      </tbody></table>
+      <p className="muted">{en ? 'Honest: the ~0.37 m ATE is the pose accuracy that bounds a clean fused surface, which is why the global-pose-graph (D1) and TSDF refinements ship opt-in and the training set keeps growing. The per-frame depth is excellent; the fused map is pose-bound. See Model history (Experiments) for every training run.' : 'Honesto: el ATE ~0.37 m es la precisión de pose que acota una superficie fusionada limpia, por eso el pose-graph global (D1) y el refinado TSDF van opt-in y el set de entrenamiento sigue creciendo. La profundidad por-cuadro es excelente; el mapa fusionado está acotado por la pose. Ver Historial de modelos (Experimentos) para cada corrida.'}</p>
     </>
   );
 
@@ -86,9 +100,9 @@ export function Benchmark({ lang }: { lang: Lang }) {
         ? 'Results for the different models employed: the classical baselines, the SOTA engine reported numbers, and this lab measured numbers, kept separate and honestly labelled.'
         : 'Resultados para los distintos modelos empleados: las líneas base clásicas, los números reportados del motor SOTA y los números medidos por este lab, separados y etiquetados honestamente.'}</p>
       <SubTabs tabs={[
-        { id: 'ladder', label: en ? 'Model ladder' : 'Escalera de modelos', body: <>{ladder}<Refs ids={['open3d', 'kissicp', 'lingbot']} /></> },
+        { id: 'ladder', label: en ? 'Model ladder' : 'Escalera de modelos', body: <>{ladder}<Refs ids={['open3d', 'kissicp', 'lingbot', 'resnet']} /></> },
         { id: 'sota', label: en ? 'Camera SOTA' : 'SOTA cámara', body: <>{cameraSota}<Refs ids={['lingbot', 'cut3r', 'vggt', 'oxfordspires']} /></> },
-        { id: 'measured', label: en ? 'Measured (this lab)' : 'Medido (este lab)', body: <>{measured}<Refs ids={['tum', 'flashinfer']} /></> },
+        { id: 'measured', label: en ? 'Measured (this lab)' : 'Medido (este lab)', body: <>{measured}<Refs ids={['tum', 'umeyama', 'flashinfer']} /></> },
         { id: 'honesty', label: en ? 'Honesty' : 'Honestidad', body: honesty },
       ]} />
     </div>
