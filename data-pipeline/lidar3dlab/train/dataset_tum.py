@@ -118,6 +118,44 @@ class TUMPairs(Dataset):
         }
 
 
+_ICL_INTR = (481.20, 480.00, 319.50, 239.50)  # ICL-NUIM camera (fy positive-ified)
+
+
+class ICLPairs(TUMPairs):
+    """ICL-NUIM (synthetic, PERFECT ground-truth depth + pose). TUM-compatible: associations.txt pairs rgb<->depth
+    by index, livingRoom*.gt.freiburg holds the GT poses (index tx ty tz qx qy qz qw), depth PNG scale 5000.
+    Reuses TUMPairs' loaders + __getitem__; only the index build differs."""
+
+    def __init__(self, seq_dir: str, image_size: int = 224, stride: int = 1, max_pairs: int | None = None):
+        self.seq_dir = Path(seq_dir)
+        self.size = image_size
+        gt: dict[int, np.ndarray] = {}
+        gtf = next(iter(self.seq_dir.glob("*.gt.freiburg")), None)
+        if gtf:
+            for line in gtf.read_text().splitlines():
+                if not line.strip() or line.startswith("#"):
+                    continue
+                v = [float(x) for x in line.split()]
+                c2w = np.eye(4)
+                c2w[:3, :3] = Rotation.from_quat(v[4:8]).as_matrix()
+                c2w[:3, 3] = v[1:4]
+                gt[int(v[0])] = c2w
+        frames = []
+        for line in (self.seq_dir / "associations.txt").read_text().splitlines():
+            p = line.split()
+            if len(p) < 4:
+                continue
+            idx = int(p[0])
+            if idx in gt:
+                frames.append((p[3], p[1], gt[idx]))       # (rgb_fn, depth_fn, c2w)
+        fx, fy, cx, cy = _ICL_INTR
+        self.K0 = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], np.float64)
+        self.W0, self.H0 = 640, 480
+        self.samples = [(frames[i], frames[i + stride]) for i in range(0, len(frames) - stride, stride)]
+        if max_pairs:
+            self.samples = self.samples[:max_pairs]
+
+
 def default_root() -> Path:
     return Path(os.environ.get("LIDAR3D_DATA_ROOT", "data/raw")) / "train" / "tum-rgbd"
 
@@ -125,3 +163,9 @@ def default_root() -> Path:
 def list_sequences() -> list[str]:
     root = default_root()
     return sorted(str(p) for p in root.glob("rgbd_dataset_*") if (p / "rgb.txt").exists())
+
+
+def icl_sequences() -> list[str]:
+    """ICL-NUIM sequences (a folder with associations.txt + a *.gt.freiburg)."""
+    root = Path(os.environ.get("LIDAR3D_DATA_ROOT", "data/raw")) / "train" / "icl-nuim"
+    return sorted(str(p.parent) for p in root.rglob("associations.txt"))

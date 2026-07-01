@@ -18,7 +18,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from ..model.nets.own_depthpose import OwnDepthPose
-from .dataset_tum import TUMPairs, list_sequences
+from .dataset_tum import ICLPairs, TUMPairs, icl_sequences, list_sequences
 
 
 def depth_loss(pred: torch.Tensor, logvar: torch.Tensor, gt: torch.Tensor, max_depth: float) -> torch.Tensor:
@@ -134,6 +134,7 @@ def main() -> None:
     ap.add_argument("--photo_w", type=float, default=0.0, help="self-supervised photometric loss weight (0=off)")
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
+    ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -146,7 +147,10 @@ def main() -> None:
     val_seq = seqs[-1]
     train_seqs = seqs[:-1] or seqs
     mp = args.max_pairs if not args.smoke else 4
-    train = ConcatDataset([TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs])
+    datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
+    if args.use_icl:
+        datasets += [ICLPairs(s, image_size=args.size, max_pairs=mp) for s in icl_sequences()]
+    train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
     model = OwnDepthPose(base=args.base, max_depth=10.0).to(device)
