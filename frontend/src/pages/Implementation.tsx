@@ -1,6 +1,6 @@
 import { type Lang } from '../i18n';
 import { SubTabs } from '../components/SubTabs';
-import { Cite, References } from '../components/References';
+import { Cite, Refs } from '../components/References';
 
 export function Implementation({ lang }: { lang: Lang }) {
   const en = lang === 'en';
@@ -56,13 +56,11 @@ export function Implementation({ lang }: { lang: Lang }) {
         ? 'The repo is instantiated from the CAOS product template (ADR-0057): a frozen base with a named staged pipeline, two enforced data contracts, a measured lane gate, and a static replay frontend. Rework lives only in the core (the engine, the visuals, the cases).'
         : 'El repo se instancia del template de producto CAOS (ADR-0057): una base congelada con un pipeline por etapas, dos contratos de datos, un gate de lane medido y un frontend de replay estático. El trabajo vive solo en el core (el motor, los visuales, los casos).'}</p>
       <SubTabs tabs={[
-        { id: 'pipe', label: en ? 'Staged pipeline' : 'Pipeline por etapas', body: pipeline },
+        { id: 'pipe', label: en ? 'Staged pipeline' : 'Pipeline por etapas', body: <>{pipeline}<Refs ids={['open3d', 'lingbot', 'kissicp']} /></> },
         { id: 'contracts', label: en ? 'Data contracts' : 'Contratos de datos', body: contracts },
         { id: 'gate', label: en ? 'Lane gate' : 'Gate de lane', body: gate },
         { id: 'env', label: en ? 'Environment' : 'Entorno', body: envtab },
       ]} />
-      <h3>{en ? 'References' : 'Referencias'}</h3>
-      <References only={['lingbot', 'open3d', 'kissicp']} />
     </div>
   );
 }

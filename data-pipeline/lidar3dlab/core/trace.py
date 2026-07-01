@@ -58,6 +58,7 @@ def build_trace(result: ReconResult, refine_info: dict) -> dict:
         "bbox_min": [round(float(x), 3) for x in result.bbox_min],
         "bbox_max": [round(float(x), 3) for x in result.bbox_max],
         "depth_thumbs": result.depth_thumbs,
+        "rgb_thumbs": getattr(result, "rgb_thumbs", []),
         "refine": refine_info,
         "summary": {"n_points": int(len(pts)), "n_frames": int(result.n_frames),
                     "path_length_m": round(float(result.path_length), 3)},

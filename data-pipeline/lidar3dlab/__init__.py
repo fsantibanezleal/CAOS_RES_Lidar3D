@@ -5,4 +5,4 @@ deep-research-chosen SOTA engine. Everything else (the two data contracts, the s
 manifest/trace, the cases-by-category registry) is the FROZEN base — instantiate it, do not redesign it.
 """
 
-__version__ = "0.05.000"  # display X.XX.XXX; PEP 440 form in pyproject.toml (0.1.0)
+__version__ = "0.06.000"  # display X.XX.XXX; PEP 440 form in pyproject.toml (0.1.0)

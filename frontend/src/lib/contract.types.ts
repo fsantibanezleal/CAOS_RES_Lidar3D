@@ -48,6 +48,7 @@ export interface Trace {
   bbox_min: number[];
   bbox_max: number[];
   depth_thumbs: DepthThumb[];
+  rgb_thumbs?: DepthThumb[]; // per-frame RGB source images (camera cases only), for the replay-synced panel
   refine: RefineInfo;
   summary: TraceSummary;
 }

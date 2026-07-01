@@ -45,7 +45,9 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
     all_p, all_c, per_frame, centers, poses, thumbs = [], [], [], [], [], []
     jitter = rng.normal(0, 0.01, size=(S, 2))
     for i in range(S):
-        z = -0.14 * i
+        # the camera looks +Z (OpenCV convention, same as the real engine) and MOVES +Z into the corridor it is
+        # imaging, so the reconstruction accumulates AHEAD of the motion (not behind it).
+        z = 0.14 * i
         c2w = np.array([[1, 0, 0, 0.05 * np.sin(i * 0.3) + jitter[i, 0]],
                         [0, 1, 0, 0.03 * np.cos(i * 0.4) + jitter[i, 1]],
                         [0, 0, 1, z]], np.float64)

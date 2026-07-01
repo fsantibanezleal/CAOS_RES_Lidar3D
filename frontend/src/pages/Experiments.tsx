@@ -1,6 +1,6 @@
 import { type Lang } from '../i18n';
 import { SubTabs } from '../components/SubTabs';
-import { Cite, References } from '../components/References';
+import { Cite, Refs } from '../components/References';
 
 export function Experiments({ lang }: { lang: Lang }) {
   const en = lang === 'en';
@@ -63,13 +63,11 @@ export function Experiments({ lang }: { lang: Lang }) {
         ? 'Cases span categories: a synthetic CPU control (the CI smoke test), the LiDAR engine, and real camera sequences baked offline on an 8 GB GPU. This page also lays out the novel agenda evaluated beyond the SOTA engine.'
         : 'Los casos cubren categorías: un control sintético CPU (el smoke de CI), el motor LiDAR y secuencias reales de cámara horneadas offline en una GPU de 8 GB. Esta página también expone la agenda novel evaluada más allá del motor SOTA.'}</p>
       <SubTabs tabs={[
-        { id: 'cases', label: en ? 'Cases' : 'Casos', body: cases },
-        { id: 'config', label: en ? '8 GB config' : 'Config 8 GB', body: config },
-        { id: 'novel', label: en ? 'Novel agenda' : 'Agenda novel', body: novel },
+        { id: 'cases', label: en ? 'Cases' : 'Casos', body: <>{cases}<Refs ids={['kissicp', 'kitti']} /></> },
+        { id: 'config', label: en ? '8 GB config' : 'Config 8 GB', body: <>{config}<Refs ids={['flashinfer', 'lingbot']} /></> },
+        { id: 'novel', label: en ? 'Novel agenda' : 'Agenda novel', body: <>{novel}<Refs ids={['oxfordspires', 'kissicp', 'mapanything', 'dinov3']} /></> },
         { id: 'honesty', label: en ? 'Honesty' : 'Honestidad', body: honesty },
       ]} />
-      <h3>{en ? 'References' : 'Referencias'}</h3>
-      <References only={['lingbot', 'oxfordspires', 'kissicp', 'mapanything', 'dinov3', 'kitti', 'flashinfer']} />
     </div>
   );
 }

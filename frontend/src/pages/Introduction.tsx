@@ -1,7 +1,7 @@
 import { type Lang } from '../i18n';
 import { Katex } from '../components/Katex';
 import { SubTabs } from '../components/SubTabs';
-import { Cite, References } from '../components/References';
+import { Cite, Refs } from '../components/References';
 
 export function Introduction({ lang }: { lang: Lang }) {
   const en = lang === 'en';
@@ -51,11 +51,9 @@ export function Introduction({ lang }: { lang: Lang }) {
         : 'Lidar 3D es un lab en la frontera de la reconstrucción 3D feed-forward: convierte un stream de video en trayectoria de cámara, profundidad métrica densa y una nube de puntos RGB, en tiempo real, sin optimización por escena.'}</p>
       <SubTabs tabs={[
         { id: 'ov', label: en ? 'Overview' : 'Panorama', body: overview },
-        { id: 'lin', label: en ? 'Lineage' : 'Linaje', body: lineage },
+        { id: 'lin', label: en ? 'Lineage' : 'Linaje', body: <>{lineage}<Refs ids={['dust3r', 'mast3r', 'vggt', 'pi3', 'mapanything', 'spann3r', 'cut3r', 'lingbot']} /></> },
         { id: 'lanes', label: en ? 'Three lanes' : 'Tres lanes', body: lanes },
       ]} />
-      <h3>{en ? 'References' : 'Referencias'}</h3>
-      <References only={['lingbot', 'dust3r', 'mast3r', 'vggt', 'pi3', 'mapanything', 'spann3r', 'cut3r']} />
     </div>
   );
 }

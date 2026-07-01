@@ -32,7 +32,7 @@ export function Header(props: {
         <a href="https://github.com/fsantibanezleal/CAOS_RES_Lidar3D" target="_blank" rel="noreferrer" title="GitHub repository" aria-label="GitHub"><GitHubIcon /></a>
         <a href="https://fsantibanezleal.github.io" target="_blank" rel="noreferrer" title="Personal site" aria-label="Personal site"><GlobeIcon /></a>
         <a href="https://fasl-work.com" target="_blank" rel="noreferrer" title="Portfolio" aria-label="Portfolio"><GridIcon /></a>
-        <button onClick={openArch} title={t(lang, 'arch')} aria-label={t(lang, 'arch')} className="ic-txt"><InfoIcon /><span>{t(lang, 'arch')}</span></button>
+        <button onClick={openArch} title={lang === 'en' ? 'How it works' : 'Cómo funciona'} aria-label={t(lang, 'arch')}><InfoIcon /></button>
         <button onClick={() => setLang(lang === 'en' ? 'es' : 'en')} title="Language" aria-label="Language">{lang.toUpperCase()}</button>
         <button onClick={() => setDark(!dark)} title={dark ? 'Light theme' : 'Dark theme'} aria-label="Theme">{dark ? <SunIcon /> : <MoonIcon />}</button>
       </div>
