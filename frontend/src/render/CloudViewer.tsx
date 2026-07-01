@@ -11,6 +11,17 @@ import { b64ToF32, b64ToU8, type Trace } from '../lib/contract.types';
 export type ColorMode = 'rgb' | 'depth';
 export type CameraMode = 'orbit' | 'first' | 'top';
 
+// a soft round sprite so points render as discs that merge into a surface (the "surfels" method), not squares
+let _disc: THREE.Texture | null = null;
+function discTexture(): THREE.Texture {
+  if (_disc) return _disc;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d')!; const rad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rad.addColorStop(0, 'rgba(255,255,255,1)'); rad.addColorStop(0.7, 'rgba(255,255,255,1)'); rad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rad; g.beginPath(); g.arc(32, 32, 32, 0, Math.PI * 2); g.fill();
+  _disc = new THREE.CanvasTexture(c); return _disc;
+}
+
 function ramp(t: number): [number, number, number] {
   const x = Math.max(0, Math.min(1, t)) * 4;
   const seg = [[30, 60, 160], [30, 180, 200], [60, 190, 90], [240, 210, 60], [220, 60, 50]];
@@ -18,8 +29,8 @@ function ramp(t: number): [number, number, number] {
   return [Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)];
 }
 
-export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean }) {
+export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true, surfel = false }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean; surfel?: boolean }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const data = useRef<{ pts: Float32Array; offsets: number[]; nFrames: number } | null>(null);
@@ -67,7 +78,15 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
   }, []);
 
   useEffect(() => { if (api.current) { api.current.scene.background = new THREE.Color(dark ? 0x0b1020 : 0xeef2f8); api.current.render(); } }, [dark]);
-  useEffect(() => { if (api.current) { (api.current.cloud.material as THREE.PointsMaterial).size = pointSize; api.current.render(); } }, [pointSize]);
+  useEffect(() => {
+    if (!api.current) return;
+    const m = api.current.cloud.material as THREE.PointsMaterial;
+    m.size = surfel ? pointSize * 3.2 : pointSize;   // surfels: larger soft discs that merge into a surface
+    m.map = surfel ? discTexture() : null;
+    m.transparent = surfel; m.alphaTest = surfel ? 0.4 : 0;
+    m.needsUpdate = true;
+    api.current.render();
+  }, [pointSize, surfel]);
 
   useEffect(() => {
     const a = api.current; if (!a || !trace) return;
