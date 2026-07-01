@@ -160,6 +160,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
               <tr><td>{t(lang, 'frames')}</td><td>{manifest.params.max_frames}</td></tr>
               <tr><td>{t(lang, 'path')}</td><td>{trace ? `${trace.path_length} m` : '·'}</td></tr>
               <tr><td>{t(lang, 'lane')}</td><td>{manifest.lane}</td></tr>
+              {manifest.dataset && <tr><td>{es(lang) ? 'Dataset' : 'Dataset'}</td><td>{manifest.dataset}</td></tr>}
+              {manifest.license && <tr><td>{es(lang) ? 'Licencia' : 'License'}</td><td>{manifest.license}</td></tr>}
             </tbody></table>
           </>
         )}

@@ -83,6 +83,8 @@ export interface CaseManifest {
   category: string;
   real_or_synthetic: string;
   expected_band: string;
+  dataset?: string;
+  license?: string;
   engine: EngineInfo;
   params: {
     source: string; // a label ("synthetic" or a sequence name), never an absolute path
