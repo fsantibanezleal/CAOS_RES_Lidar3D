@@ -3,6 +3,14 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.09.002] · 2026-07-01
+
+### Added
+- Overlay toggles in the App: **Cones** (observer frustums) and **Trajectory** (the red path), on/off, in both
+  the three.js and deck.gl renderers.
+- More datasets downloaded for training/testing: ICL-NUIM (synthetic RGB-D, perfect GT) and 7-Scenes (real
+  RGB-D), alongside the TUM RGB-D sequences.
+
 ## [0.09.001] · 2026-07-01
 
 ### Fixed (viewer transforms + per-frame panel + longer scenes; reviewed in detail)

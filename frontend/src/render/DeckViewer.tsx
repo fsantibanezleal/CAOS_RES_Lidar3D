@@ -19,8 +19,8 @@ type V3 = [number, number, number];
 const apply = (p: Float32Array, o: number, x: number, y: number, z: number): V3 =>
   [p[o] * x + p[o + 1] * y + p[o + 2] * z + p[o + 3], p[o + 4] * x + p[o + 5] * y + p[o + 6] * z + p[o + 7], p[o + 8] * x + p[o + 9] * y + p[o + 10] * z + p[o + 11]];
 
-export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode }) {
+export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<any>(null);
   const vsRef = useRef<any>(null);
@@ -75,7 +75,7 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
 
   useEffect(() => { redraw(true); /* re-fit on camera-mode switch */ }, [cameraMode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { redraw(cameraMode === 'first'); /* FP follows the player; others keep the view */ }, [reveal]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { redraw(false); }, [pointSize, dark]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { redraw(false); }, [pointSize, dark, showCones, showTraj]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { deckRef.current?.finalize?.(); deckRef.current = null; }, []);
 
   function revealFrames(): number {
@@ -116,22 +116,22 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
     const d = data.current; if (!d || !deckRef.current) return;
     const rf = revealFrames();
     const ext = [new DataFilterExtension({ filterSize: 1 })];
-    const layers = [
+    const layers: any[] = [
       new PointCloudLayer({
         id: 'cloud', coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, pointSize: Math.max(1, pointSize * 150),
         data: { length: d.n, attributes: { getPosition: { value: d.pos, size: 3 }, getColor: { value: d.col, size: 3, normalized: true } } },
         getFilterValue: (_: unknown, o: { index: number }) => o.index, filterRange: [0, Math.max(1, revealPts())], extensions: ext,
       }),
-      new LineLayer({
+      ...(showTraj ? [new LineLayer({
         id: 'traj', coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, data: d.traj, getWidth: 2.5,
         getSourcePosition: (o: any) => o.s, getTargetPosition: (o: any) => o.t, getColor: [255, 82, 82],
         getFilterValue: (o: any) => o.f, filterRange: [0, rf], extensions: ext,
-      }),
-      new LineLayer({
+      })] : []),
+      ...(showCones ? [new LineLayer({
         id: 'frustums', coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, data: d.frus, getWidth: 1.5,
         getSourcePosition: (o: any) => o.s, getTargetPosition: (o: any) => o.t, getColor: [51, 214, 166],
         getFilterValue: (o: any) => o.f, filterRange: [0, rf], extensions: ext,
-      }),
+      })] : []),
     ];
     const props: any = { layers };
     if (resetView) { vsRef.current = computeVS(); props.viewState = vsRef.current; }

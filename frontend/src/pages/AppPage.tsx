@@ -27,6 +27,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
   const [renderer, setRenderer] = useState<'three' | 'deck'>('three');
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
+  const [showCones, setShowCones] = useState(true);
+  const [showTraj, setShowTraj] = useState(true);
   const raf = useRef(0);
 
   useEffect(() => {
@@ -98,6 +100,12 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
           {CAMS.map(([m, lab]) => <button key={m} className={'chip' + (camMode === m ? ' on' : '')} onClick={() => setCamMode(m)}>{lab}</button>)}
         </div>
 
+        <label className="lab">{es(lang) ? 'Superposiciones' : 'Overlays'}</label>
+        <div className="chips">
+          <button className={'chip' + (showCones ? ' on' : '')} onClick={() => setShowCones(!showCones)}>{es(lang) ? 'Conos' : 'Cones'}</button>
+          <button className={'chip' + (showTraj ? ' on' : '')} onClick={() => setShowTraj(!showTraj)}>{es(lang) ? 'Trayectoria' : 'Trajectory'}</button>
+        </div>
+
         <label className="lab">{es(lang) ? 'Motor de render' : 'Renderer'}</label>
         <div className="chips">
           <button className={'chip' + (renderer === 'three' ? ' on' : '')} onClick={() => setRenderer('three')}>three.js</button>
@@ -122,8 +130,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
       <section className="stage">
         {trace && (renderer === 'deck'
-          ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} />
-          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} />)}
+          ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />
+          : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>
