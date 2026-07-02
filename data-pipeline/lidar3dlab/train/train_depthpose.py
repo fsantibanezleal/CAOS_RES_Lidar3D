@@ -162,8 +162,8 @@ def main() -> None:
                     default="scratch",
                     help="encoder: from-scratch UNet, a pretrained ImageNet ResNet-18, or a FROZEN DINOv2 foundation "
                          "backbone (vits/vitb/vitl) with a DPT-style decoder (lingbot-class features; fits 8 GB frozen)")
-    ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
-                    help="pose front-end: global-pooled Siamese MLP, or a local correlation cost volume (better pose)")
+    ap.add_argument("--pose_head", choices=["siamese", "corr", "geo"], default="siamese",
+                    help="pose front-end: Siamese MLP, a correlation cost volume, or 'geo' (metric-depth-seeded differentiable geometric pose, M-B)")
     ap.add_argument("--init", type=str, default="", help="warm-start: load matching weights from a checkpoint (e.g. reuse a good depth net when training a new pose head)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
