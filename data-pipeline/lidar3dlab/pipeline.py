@@ -32,8 +32,12 @@ def _own_model_label() -> str:
     meta_p = MODELS_ROOT / "own-depthpose" / "own-depthpose.meta.json"
     try:
         m = json.loads(meta_p.read_text())
-        bb = "pretrained ResNet-18 backbone" if m.get("backbone") == "resnet18" else "from-scratch UNet"
+        _bb = str(m.get("backbone", "scratch"))
+        bb = ("pretrained ResNet-18 backbone" if _bb == "resnet18"
+              else f"frozen DINOv2 {_bb.split('_')[-1]} backbone" if _bb.startswith("dinov2")
+              else "from-scratch UNet")
         data = "TUM RGB-D + ICL-NUIM" if m.get("use_icl") else "TUM RGB-D"
+        data += " + TartanGround" if m.get("use_tartan") else ""
         ate = f", {m['val_ate']:.2f} m held-out ATE" if m.get("val_ate") else ""
         return f"OUR depth+pose net ({bb} + our decoder/pose, trained on {data}{ate})"
     except Exception:  # noqa: BLE001

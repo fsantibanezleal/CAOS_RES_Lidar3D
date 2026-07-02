@@ -29,6 +29,16 @@ household` sequence (~300 pairs), aligned with Umeyama; lower is better. The mac
 | R4 | **Correlation pose head** | RAFT/TartanVO-style local cost volume replacing the Siamese pooled-feature head | **NEGATIVE**: per-pair pose loss dropped (0.0008) but held-out ATE got WORSE (0.63 -> 0.80 m over epochs) — good local pose, worse accumulation. Not deployed | archived, not default |
 | R5 | more data (TUM 5 -> 11 seq) | retrain the Siamese head on ~16k pairs (was ~7k) + ICL | **did NOT help**: plateaued at 0.68 m (the extra harder sequences hurt the specific long_office eval); confirms the architectural ceiling | no |
 | R6 | **best recovery run** | retrain the Siamese head on the winning 4-seq TUM subset + ICL (11k pairs), 12 epochs | **0.28 m** held-out ATE (beats the old 0.37 m); the best OWN model to date | **yes (LIVE, M8)** |
+| R7 | **frozen DINOv2 ViT-B backbone** (DepthAnything recipe: DINOv2 + DPT decoder) | 89.6 M total / **only 3.0 M trainable / 0.65 GB VRAM** (proves 8 GB is NOT the constraint) | pose ATE 0.61 m (worse, head-limited) but **depth-AbsRel 0.22 vs the ResNet's 0.38 = 42 % better DEPTH** (measured with the new metric) | archived; depth-superior |
+| R8 | **M-A: DINOv2 depth + D1 global pose-graph** | bake with the better depth + the global pose-graph, no new training | did NOT give a clean surface: the 0.61 m raw-pose init is too poor for the global BA, which over-constrained (359 loop edges, path blew up to 7 m) | no |
+
+**Decisive finding (the point of the whole exploration).** With a proper DEPTH metric we could finally see it:
+a bigger/frozen backbone (DINOv2) improves **depth by 42 %**, but the trajectory ATE is capped by the **regression
+pose head** regardless of backbone or data, and better depth + post-hoc global optimization (M-A) does NOT fix it.
+This is exactly why SOTA (DROID-SLAM, DPVO, DINO-VO) builds pose from a **differentiable bundle-adjustment** layer,
+not regression. The validated next lever is a differentiable-BA pose head seeded by our metric depth (plan:
+`wip/lidar3d/plan-differentiable-ba-pose.md`, M-B). 8 GB is not the constraint; the pose ARCHITECTURE is.
+
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
 checkpoint with a killed-early run's worse checkpoint (0.77 m). The *deployed* artifacts (v0.11.000) are safe (baked +
