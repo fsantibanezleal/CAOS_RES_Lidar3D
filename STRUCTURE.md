@@ -1,6 +1,6 @@
 # Template blueprint — the authoritative structure (align here BEFORE mass-generating)
 
-This is the agreed shape of a REAL product repo. Every requirement Felipe raised is captured here. Nothing is
+This is the agreed shape of a REAL product repo. Every stated requirement is captured here. Nothing is
 built against it until the shape is approved, so we don't build-then-redo.
 
 ## Three execution lanes + a replay fallback — SEPARATE dependencies AND implementation

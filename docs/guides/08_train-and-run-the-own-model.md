@@ -14,8 +14,8 @@ pip install -r data-pipeline/requirements.txt        # torch, torchvision, open3
 Point the two env vars at your local data + model volumes (never hard-code machine paths in the repo):
 
 ```bash
-export LIDAR3D_DATA_ROOT="E:/_Datos/3D_Spatial_Reconstruction"   # holds train/tum-rgbd, train/icl-nuim, train/7scenes
-export LIDAR3D_MODELS_ROOT="…/models"                            # where checkpoints are written/read
+export LIDAR3D_DATA_ROOT="/path/to/data"     # holds train/tum-rgbd, train/icl-nuim, train/7scenes, train/tartanground
+export LIDAR3D_MODELS_ROOT="/path/to/models" # where checkpoints are written/read
 ```
 
 ## 1. Train the model

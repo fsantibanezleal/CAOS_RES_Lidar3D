@@ -2,7 +2,7 @@
 renderer). Exports the RGB cloud to a binary PLY, then runs PotreeConverter (a native binary; path via
 LIDAR3D_POTREECONVERTER) to produce an octree (metadata.json + octree.bin + hierarchy.bin) under
 frontend/public/potree/<case>/ (committed static assets served by the SPA). This is the offline conversion step
-Felipe asked for: "para eso tienes el pipeline offline".
+of the precompute pipeline.
 
 Coordinate note: the web renderers map OpenCV world (Y-down, Z-forward) -> render frame (x,-y,-z). We bake the
 octree already in the render frame so Potree matches three.js/deck.gl exactly.
@@ -19,11 +19,12 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-_DEFAULT_PC = "E:/_Tools/PotreeConverter/PotreeConverter_2.1.3_x64_windows/PotreeConverter.exe"
 
 
 def potreeconverter() -> str:
-    return os.environ.get("LIDAR3D_POTREECONVERTER", _DEFAULT_PC)
+    """Path to the native PotreeConverter binary. Set LIDAR3D_POTREECONVERTER to your local install; falls back to
+    `PotreeConverter` on PATH (no machine-specific path is baked into this public repo)."""
+    return os.environ.get("LIDAR3D_POTREECONVERTER", "PotreeConverter")
 
 
 def _write_las(pts: np.ndarray, cols: np.ndarray, path: Path) -> None:

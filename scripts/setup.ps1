@@ -1,5 +1,5 @@
 # Create BOTH venvs + install per-lane requirements + the editable package. Idempotent. No global installs.
-# .ps1 parity of setup.sh (Felipe runs PowerShell on Windows).
+# .ps1 parity of setup.sh (the primary environment is PowerShell on Windows).
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $py = if ($env:PYTHON) { $env:PYTHON } else { "python" }

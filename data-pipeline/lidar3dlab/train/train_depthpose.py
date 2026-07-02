@@ -18,7 +18,8 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from ..model.nets.own_depthpose import OwnDepthPose
-from .dataset_tum import ICLPairs, TUMPairs, icl_sequences, list_sequences
+from .dataset_tum import (ICLPairs, TartanGroundPairs, TUMPairs, icl_sequences, list_sequences,
+                          tartanground_sequences)
 
 
 def depth_loss(pred: torch.Tensor, logvar: torch.Tensor, gt: torch.Tensor, max_depth: float) -> torch.Tensor:
@@ -101,27 +102,37 @@ def umeyama_ate(pred_c: np.ndarray, gt_c: np.ndarray) -> float:
 
 
 @torch.no_grad()
-def evaluate(model: OwnDepthPose, seq_dir: str, device: torch.device, size: int, max_pairs: int) -> float:
+def evaluate(model: OwnDepthPose, seq_dir: str, device: torch.device, size: int, max_pairs: int) -> tuple:
+    """Returns (ATE, depth-AbsRel). ATE = accumulated-trajectory error (pose quality). AbsRel = mean |pred-gt|/gt on
+    valid GT-depth pixels (depth quality) - the metric that captures backbone/data gains the pose ATE cannot see."""
     ds = TUMPairs(seq_dir, image_size=size, max_pairs=max_pairs)
     if len(ds) < 4:
-        return float("nan")
+        return float("nan"), float("nan")
     model.eval()
     c2w = np.eye(4)
     pred_c, gt_c = [c2w[:3, 3].copy()], []
     gt_accum = np.eye(4)
+    absrel_sum, absrel_n = 0.0, 0
     for i in range(len(ds)):
         s = ds[i]
         r0 = torch.from_numpy(s["rgb0"])[None].to(device)
         r1 = torch.from_numpy(s["rgb1"])[None].to(device)
-        rel = model(r0, r1)["rel_pose"][0].float().cpu().numpy()
+        out = model(r0, r1)
+        rel = out["rel_pose"][0].float().cpu().numpy()
         c2w = c2w @ rel
         pred_c.append(c2w[:3, 3].copy())
         gt_accum = gt_accum @ s["rel_pose"]
         gt_c.append(gt_accum[:3, 3].copy())
+        pd = out["depth0"][0, 0].float().cpu().numpy()
+        gd = s["depth0"]
+        m = gd > 1e-3
+        if m.any():
+            absrel_sum += float(np.mean(np.abs(pd[m] - gd[m]) / gd[m]))
+            absrel_n += 1
     pred_c = np.asarray(pred_c[:-1])
     gt_c = np.asarray(gt_c)
     n = min(len(pred_c), len(gt_c))
-    return umeyama_ate(pred_c[:n], gt_c[:n])
+    return umeyama_ate(pred_c[:n], gt_c[:n]), absrel_sum / max(1, absrel_n)
 
 
 def _log_experiment(out_dir: Path, rec: dict) -> None:
@@ -145,9 +156,12 @@ def main() -> None:
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
+    ap.add_argument("--use_tartan", action="store_true", help="also train on TartanGround (synthetic, perfect depth+pose; far/sky masked to the model's range)")
     ap.add_argument("--seqs", type=str, default="", help="comma-separated substrings; keep only matching TUM train sequences (e.g. 'freiburg1_desk,freiburg1_xyz'). Empty = all discovered")
-    ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
-                    help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
+    ap.add_argument("--backbone", choices=["scratch", "resnet18", "dinov2_vits14", "dinov2_vitb14", "dinov2_vitl14"],
+                    default="scratch",
+                    help="encoder: from-scratch UNet, a pretrained ImageNet ResNet-18, or a FROZEN DINOv2 foundation "
+                         "backbone (vits/vitb/vitl) with a DPT-style decoder (lingbot-class features; fits 8 GB frozen)")
     ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
                     help="pose front-end: global-pooled Siamese MLP, or a local correlation cost volume (better pose)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
@@ -170,6 +184,8 @@ def main() -> None:
     datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
     if args.use_icl:
         datasets += [ICLPairs(s, image_size=args.size, max_pairs=mp) for s in icl_sequences()]
+    if args.use_tartan:
+        datasets += [TartanGroundPairs(s, image_size=args.size, max_pairs=mp) for s in tartanground_sequences()]
     train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 
@@ -216,15 +232,16 @@ def main() -> None:
                 break
         if args.smoke:
             break
-        ate = evaluate(model, val_seq, device, args.size, max_pairs=300)
+        ate, absrel = evaluate(model, val_seq, device, args.size, max_pairs=300)
         improved = ate < best_ate
-        print(f"[epoch {ep}] val ATE={ate:.4f} m" + (" (best, saved)" if improved else ""))
+        print(f"[epoch {ep}] val ATE={ate:.4f} m  depth-AbsRel={absrel:.4f}" + (" (best, saved)" if improved else ""))
         n_params = sum(p.numel() for p in model.parameters())
         _log_experiment(out_dir, {                     # append every epoch so NO experiment is ever lost
             "backbone": args.backbone, "pose_head": args.pose_head, "epoch": ep, "val_ate": round(ate, 4),
-            "best_ate": round(min(ate, best_ate), 4),
+            "depth_absrel": round(absrel, 4), "best_ate": round(min(ate, best_ate), 4),
             "is_best": improved, "params_M": round(n_params / 1e6, 3), "base": args.base, "size": args.size,
-            "lr": args.lr, "use_icl": args.use_icl, "train_pairs": len(train), "val_seq": os.path.basename(val_seq),
+            "lr": args.lr, "use_icl": args.use_icl, "use_tartan": getattr(args, "use_tartan", False),
+            "train_pairs": len(train), "val_seq": os.path.basename(val_seq),
         })
         if improved:                                   # EARLY STOPPING: keep the BEST checkpoint, not the last
             best_ate = ate
@@ -236,7 +253,8 @@ def main() -> None:
             import json as _json
             (out_dir / "own-depthpose.meta.json").write_text(_json.dumps({    # small sidecar for accurate engine labels
                 "backbone": args.backbone, "pose_head": args.pose_head, "val_ate": round(ate, 4),
-                "size": args.size, "base": args.base, "use_icl": args.use_icl}))
+                "size": args.size, "base": args.base, "use_icl": args.use_icl,
+                "use_tartan": getattr(args, "use_tartan", False)}))
 
     if args.smoke:
         print("SMOKE OK")

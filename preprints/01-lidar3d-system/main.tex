@@ -1,0 +1,100 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx,hyperref,url,xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\title{\textbf{Lidar3D: Streaming Monocular 3D Reconstruction on Modest Hardware\\
+\large Depth is Cheap, Pose is the Bottleneck}}
+\author{CAOS Research Lab}
+\date{Draft, tracks the live state (see \texttt{docs/models/}). 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We build a public, model-agnostic streaming 3D reconstruction lab that turns an ordered RGB stream into a camera
+trajectory, dense metric depth, and a fused point cloud, feed-forward, on an 8\,GB laptop GPU. Alongside a vendored
+state-of-the-art streaming foundation model used as a reference, we train our \emph{own} depth+pose network from
+modest data and dissect where its quality is lost. Our central, measured finding is that on this class of model the
+\textbf{per-frame depth is cheap to improve but the trajectory is bottlenecked by the pose head}: a frozen DINOv2
+backbone lowers depth error by 42\% (AbsRel $0.22$ vs $0.38$) at $0.65$\,GB of VRAM, yet the accumulated trajectory
+error is capped near $0.28$--$0.61$\,m regardless of backbone or training data, and post-hoc global bundle
+adjustment does not repair it. This mirrors the state of the art (DROID-SLAM, DPVO, DINO-VO), which obtain accurate
+pose from a \emph{differentiable bundle-adjustment} layer rather than a regression head. We propose, as our
+contribution, a differentiable BA pose head \emph{seeded by our metric depth}, which removes the monocular
+scale ambiguity and is feasible on modest hardware. We report the full experiment ledger and keep all negative
+results.
+\end{abstract}
+
+\section{Introduction}
+Classical visual SLAM and LiDAR odometry recover geometry by iterative optimization; the feed-forward line
+(DUSt3R $\to$ MASt3R $\to$ VGGT $\to$ streaming heirs) regresses geometry directly in a single pass. Our lab uses a
+streaming foundation model of this kind as the reference (camera engine) and Open3D point-to-plane ICP as a LiDAR
+engine, behind one \texttt{reconstruct(spec)$\to$ReconResult} contract. In parallel we train our own, deliberately
+small, depth+pose network to \emph{understand} what limits reconstruction quality on modest hardware, and to find
+where we can innovate. This paper documents the system, the methodology, the data, and the measured results.
+
+\section{System}
+\textbf{Model-agnostic engine.} A registry exposes control (synthetic), classical (ICP), SOTA-reference, and
+\emph{ours} engines behind one contract, so they are directly comparable. \\
+\textbf{Our depth+pose network.} A shared encoder feeds (i) a depth decoder emitting metric depth
+$\hat D = D_{\max}\sigma(\cdot)$ with an aleatoric log-variance (confidence $c=e^{-\log\hat\sigma^2}$ used to weight
+the loss and filter the cloud), and (ii) a relative-pose head regressing an $\mathfrak{se}(3)$ tangent mapped to
+$SE(3)$ by our Rodrigues exponential. Three interchangeable backbones share the forward signature: a from-scratch
+UNet, an ImageNet ResNet-18, and a frozen DINOv2 ViT (the DepthAnything recipe: DINOv2 + a DPT-style decoder). \\
+\textbf{Refinement ladder (inference).} Real per-dataset intrinsics + a far-depth clamp + frame-to-frame
+point-to-plane ICP (default); optionally a global pose-graph with loop closure and TSDF volumetric fusion.
+
+\section{Methodology}
+We report \emph{two} metrics every epoch: pose ATE (accumulated trajectory error, Umeyama-aligned) and depth AbsRel
+(mean $|\hat D - D|/D$ over valid pixels). Reporting depth was essential: ATE alone hid backbone/data gains.
+Training uses best-checkpoint early stopping on a pinned held-out sequence and writes a unique timestamped archive
+per run (so no run clobbers another). Deployment is gated on the \emph{baked} reconstruction, not the raw metric,
+because the inference pose is geometric (ICP-on-depth); a better-depth model can bake a better map even with a worse
+raw ATE. Negative results are kept in the ledger.
+
+\section{Data}
+Training: TUM RGB-D (11 sequences, registered metric depth + GT trajectory), ICL-NUIM (synthetic perfect depth), and
+TartanGround (TartanAir v2, perfect synthetic depth+pose, downloaded per-trajectory). Each case uses the dataset's
+\emph{real} intrinsics; a wrong fixed field-of-view systematically misaligns frames. Far/sky depth beyond the model
+range is masked. Raw data resolves from an environment variable; only compact derived artifacts are versioned.
+
+\section{Experiments and Results}
+Table~\ref{tab:findings} lists the load-bearing measurements.
+\begin{table}[t]\centering\small
+\begin{tabular}{@{}p{4.6cm}p{2.6cm}@{}}
+\toprule
+Finding & Evidence \\ \midrule
+8\,GB is not the constraint & training uses $0.40$/$8.6$\,GB; frozen DINOv2 ViT-B at $0.65$\,GB; ViT-L @448px at $4.26$\,GB \\
+A frozen big backbone improves \textbf{depth} & DINOv2 AbsRel $0.22$ vs ResNet $0.38$ ($-42\%$) \\
+\textbf{Pose ATE is head-limited} & ResNet $0.28$\,m, DINOv2 $0.61$\,m, correlation head $0.63$--$0.80$\,m, $+6$ seq no help \\
+Better depth + global BA (M-A) $\ne$ clean map & DINOv2 + pose-graph over-constrained (359 loop edges, path $7$\,m) \\
+\bottomrule
+\end{tabular}
+\caption{Measured findings. Full ledger: \texttt{models/own-depthpose/experiments.jsonl}.}
+\label{tab:findings}
+\end{table}
+The interpretation is consistent across every run: capacity and data raise depth quality; the trajectory is limited
+by the regression pose head, which has no geometric constraint, and no amount of post-hoc optimization on a poor
+pose initialization recovers a clean surface.
+
+\section{Proposed innovation}
+We propose replacing the regression pose head with a \textbf{sparse differentiable bundle-adjustment head seeded by
+our metric depth}: lift sparse correspondences to 3D with the predicted depth, then solve for the relative pose with
+a differentiable weighted alignment / Gauss-Newton step over an $SE(3)\oplus$ inverse-depth patch graph. The metric
+depth removes the monocular scale ambiguity, making BA well-posed from the first iteration, which is our edge over
+scale-free monocular BA. Sparsity makes it laptop-feasible (cf.\ DPVO at $\sim$5\,GB). Companion proposal:
+\texttt{preprints/02-metric-seeded-ba-pose}.
+
+\section{Limitations}
+Training foundation-scale models or full-resolution dense BA exceeds 8\,GB. We lack a large calibrated outdoor-real
+set with GT pose, so the honest evaluation is train-on-synthetic, test held-out on TUM. The fused monocular map is
+bounded by pose accuracy; the per-frame depth is not the limitation.
+
+\section{Conclusion}
+On modest hardware, depth is cheap and pose is the bottleneck. The path from a diffuse cloud to a clean surface is a
+geometric, differentiable pose, not more capacity, data, or post-processing. We keep the full, honest record so the
+line of experiments is reproducible.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
