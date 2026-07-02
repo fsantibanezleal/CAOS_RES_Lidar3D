@@ -117,7 +117,7 @@ def evaluate(model: OwnDepthPose, seq_dir: str, device: torch.device, size: int,
         s = ds[i]
         r0 = torch.from_numpy(s["rgb0"])[None].to(device)
         r1 = torch.from_numpy(s["rgb1"])[None].to(device)
-        out = model(r0, r1)
+        out = model(r0, r1, k=torch.from_numpy(s["K"])[None].to(device))
         rel = out["rel_pose"][0].float().cpu().numpy()
         c2w = c2w @ rel
         pred_c.append(c2w[:3, 3].copy())
@@ -164,6 +164,7 @@ def main() -> None:
                          "backbone (vits/vitb/vitl) with a DPT-style decoder (lingbot-class features; fits 8 GB frozen)")
     ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
                     help="pose front-end: global-pooled Siamese MLP, or a local correlation cost volume (better pose)")
+    ap.add_argument("--init", type=str, default="", help="warm-start: load matching weights from a checkpoint (e.g. reuse a good depth net when training a new pose head)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -191,6 +192,9 @@ def main() -> None:
 
     model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone,
                          pose_head=args.pose_head).to(device)
+    if args.init:                                          # warm-start (e.g. reuse a trained depth net for a geo pose run)
+        miss, unexp = model.load_state_dict(torch.load(args.init, map_location="cpu")["model"], strict=False)
+        print(f"warm-started from {os.path.basename(args.init)} (missing={len(miss)}, unexpected={len(unexp)})")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
@@ -211,7 +215,7 @@ def main() -> None:
             rel = b["rel_pose"].to(device)
             Kb = b["K"].to(device)
             with torch.autocast("cuda", dtype=dtype, enabled=use_cuda):
-                out = model(r0, r1)
+                out = model(r0, r1, k=Kb)
                 ld = depth_loss(out["depth0"].float(), out["logvar0"].float(), d0, 10.0)
                 lp = pose_loss(out["rel_pose"].float(), rel)
                 loss = ld + lp
