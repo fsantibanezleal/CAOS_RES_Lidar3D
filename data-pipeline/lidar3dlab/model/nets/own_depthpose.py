@@ -260,6 +260,85 @@ class DinoDepthDecoder(nn.Module):
         return self.max_depth * torch.sigmoid(h[:, :1]), h[:, 1:].clamp(-8, 8)
 
 
+def weighted_procrustes(p0: torch.Tensor, p1: torch.Tensor, w: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    """Differentiable rigid alignment (weighted Kabsch/SVD): returns the 4x4 transform T mapping frame-0 points to
+    frame-1, i.e. R,t minimizing sum_k w_k || R p0_k + t - p1_k ||^2. p0,p1: [B,N,3]; w: [B,N] (>=0). Backprop-safe
+    (the reflection fix uses det, not a hard branch). This is the geometric core of the metric-depth-seeded pose.
+    Runs in float32 with autocast OFF (SVD needs it, and matmuls under autocast would downcast to bf16)."""
+    with torch.autocast(device_type=p0.device.type, enabled=False):
+        p0, p1, w = p0.float(), p1.float(), w.float()
+        w = w / (w.sum(1, keepdim=True) + eps)
+        mu0 = (w.unsqueeze(-1) * p0).sum(1, keepdim=True)         # weighted centroids [B,1,3]
+        mu1 = (w.unsqueeze(-1) * p1).sum(1, keepdim=True)
+        x, y = p0 - mu0, p1 - mu1
+        s = (w.unsqueeze(-1) * x).transpose(1, 2) @ y             # [B,3,3] weighted cross-covariance
+        u, _, vh = torch.linalg.svd(s)
+        v = vh.transpose(1, 2)
+        d = torch.det(v @ u.transpose(1, 2))                     # +/-1: cancel any reflection
+        diag = torch.diag_embed(torch.stack([torch.ones_like(d), torch.ones_like(d), d], -1))
+        r = v @ diag @ u.transpose(1, 2)
+        t = mu1.squeeze(1) - (r @ mu0.transpose(1, 2)).squeeze(-1)
+    tf = torch.eye(4, device=p0.device, dtype=torch.float32).unsqueeze(0).repeat(p0.shape[0], 1, 1)
+    tf[:, :3, :3] = r
+    tf[:, :3, 3] = t
+    return tf
+
+
+def _sample_at(img: torch.Tensor, px: torch.Tensor) -> torch.Tensor:
+    """Bilinear-sample a [B,1,H,W] map at [B,N,2] image-pixel coords -> [B,N]."""
+    h, w = img.shape[-2:]
+    g = torch.stack([2 * px[..., 0] / (w - 1) - 1, 2 * px[..., 1] / (h - 1) - 1], -1)
+    return F.grid_sample(img, g[:, None], align_corners=True, mode="bilinear").squeeze(1).squeeze(1)
+
+
+def _unproject_px(px: torch.Tensor, depth: torch.Tensor, k: torch.Tensor) -> torch.Tensor:
+    """Pixel coords [B,N,2] + metric depth [B,N] + intrinsics [B,3,3] -> camera-frame 3D points [B,N,3]."""
+    fx, fy = k[:, 0, 0:1], k[:, 1, 1:2]
+    cx, cy = k[:, 0, 2:3], k[:, 1, 2:3]
+    x = (px[..., 0] - cx) / fx * depth
+    y = (px[..., 1] - cy) / fy * depth
+    return torch.stack([x, y, depth], -1)
+
+
+class GeoPoseHead(nn.Module):
+    """Metric-depth-seeded GEOMETRIC relative pose (the differentiable-BA milestone, M-B). Instead of regressing the
+    pose, it (1) forms soft feature correspondences frame0->frame1 (learned descriptors + a global soft-argmax),
+    (2) lifts both endpoints to 3D with the predicted metric depth + intrinsics, and (3) solves a differentiable
+    weighted-Procrustes for the rigid relative pose. The metric depth fixes the monocular scale so the geometry is
+    well-posed. This is the estimator family accurate learned VO uses (DROID/DPVO/DINO-VO), not a regression MLP."""
+
+    def __init__(self, feat: int, proj: int = 128):
+        super().__init__()
+        self.q = nn.Conv2d(feat, proj, 1)
+        self.k = nn.Conv2d(feat, proj, 1)
+        self.conf = nn.Sequential(nn.Conv2d(feat, 64, 1), nn.GELU(), nn.Conv2d(64, 1, 1))
+        self.temp = nn.Parameter(torch.tensor(3.0))
+
+    def forward(self, f0: torch.Tensor, f1: torch.Tensor, d0: torch.Tensor, d1: torch.Tensor,
+                k: torch.Tensor) -> torch.Tensor:
+        b, _, h, w = f0.shape
+        hi, wi = d0.shape[-2:]
+        q = F.normalize(self.q(f0), dim=1).flatten(2)                 # [B,proj,N]
+        kk = F.normalize(self.k(f1), dim=1).flatten(2)
+        corr = torch.einsum("bcn,bcm->bnm", q, kk) * self.temp.clamp(0.5, 20)
+        attn = corr.softmax(-1)                                       # soft frame0->frame1 correspondence
+        ys, xs = torch.meshgrid(torch.arange(h, device=f0.device), torch.arange(w, device=f0.device), indexing="ij")
+        gx = (xs.flatten().float() + 0.5) * (wi / w)                  # grid -> image pixels
+        gy = (ys.flatten().float() + 0.5) * (hi / h)
+        grid = torch.stack([gx, gy], -1)[None].expand(b, -1, -1)      # [B,N,2] pixel coords of the frame grid
+        # frame-0 points: lift the grid by its depth. frame-1 target: lift EVERY grid point to 3D, then take the
+        # soft (attention-weighted) average IN 3D. Averaging 3D points (not pixels-then-sample) is geometrically
+        # sound for a diffuse softmax, and it is the differentiable soft-correspondence a BA step consumes.
+        d0s = _sample_at(d0, grid).clamp(min=1e-3)
+        d1g = _sample_at(d1, grid).clamp(min=1e-3)
+        p0 = _unproject_px(grid, d0s, k)                              # [B,N,3] frame-0 3D points
+        p1_all = _unproject_px(grid, d1g, k)                          # [B,N,3] frame-1 3D points (all grid)
+        p1 = attn @ p1_all                                            # [B,N,3] soft 3D correspondence per frame-0 pt
+        conf = self.conf(f0).flatten(2).squeeze(1).sigmoid() * attn.max(-1).values   # descriptor conf x match peak
+        t01 = weighted_procrustes(p0, p1, conf + 1e-4)               # frame0 -> frame1
+        return torch.linalg.inv(t01)                                 # our convention: rel maps frame1 -> frame0
+
+
 class OwnDepthPose(nn.Module):
     """The full model: per-frame depth+conf and pairwise relative pose. Interchangeable backbones behind one forward
     signature: "scratch" (DepthNet + PoseNet, zero external weights), "resnet18" (ImageNet ResNet shared by
@@ -275,33 +354,41 @@ class OwnDepthPose(nn.Module):
             self.enc = DinoV2Encoder(name=backbone)
             self.dec = DinoDepthDecoder(self.enc.embed_dim, n_levels=len(self.enc.layers),
                                         base=max(base, 64), max_depth=max_depth)
-            self.posehead = SiamesePoseHead(self.enc.embed_dim)
+            self._plevel = -1                                          # grid-feature level for corr/geo heads
+            grid_feat, pool_feat = self.enc.embed_dim, self.enc.embed_dim
         elif backbone == "resnet18":
             self.enc = PretrainedEncoder(pretrained=pretrained)
             self.dec = DepthDecoder(self.enc.out_ch, base, max_depth)
-            if pose_head == "corr":
-                self.posehead = CorrPoseHead(feat=self.enc.out_ch[3])   # correlation on layer3 (/16) features
-            else:
-                self.posehead = SiamesePoseHead(self.enc.out_ch[-1])
+            self._plevel = 3                                          # layer3 (/16)
+            grid_feat, pool_feat = self.enc.out_ch[3], self.enc.out_ch[-1]
         else:
             self.depth = DepthNet(base, max_depth)
             self.pose = PoseNet()
-
-    def forward(self, rgb0: torch.Tensor, rgb1: torch.Tensor) -> dict:
-        if self.backbone.startswith("dinov2"):
-            f0 = self.enc(rgb0)
-            f1 = self.enc(rgb1)
-            depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
-            xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
-        elif self.backbone == "resnet18":
-            f0 = self.enc(rgb0)
-            f1 = self.enc(rgb1)
-            depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
-            if self.pose_head == "corr":
-                xi = self.posehead(f0[3], f1[3])                        # correlation cost volume -> se(3)
-            else:
-                xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
+            return
+        if pose_head == "geo":
+            self.posehead = GeoPoseHead(feat=grid_feat)               # metric-depth-seeded differentiable geometry
+        elif pose_head == "corr":
+            self.posehead = CorrPoseHead(feat=grid_feat)
         else:
+            self.posehead = SiamesePoseHead(pool_feat)
+
+    def forward(self, rgb0: torch.Tensor, rgb1: torch.Tensor, k: torch.Tensor | None = None) -> dict:
+        if self.backbone == "scratch":
             depth0, logvar0 = self.depth(rgb0)
             xi = self.pose(rgb0, rgb1)
+            return {"depth0": depth0, "logvar0": logvar0, "xi": xi, "rel_pose": se3_exp(xi)}
+        f0 = self.enc(rgb0)
+        f1 = self.enc(rgb1)
+        depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
+        if self.pose_head == "geo":                                  # GEOMETRIC pose from metric depth (no se(3) reg)
+            if k is None:
+                raise ValueError("pose_head='geo' needs intrinsics k=[B,3,3]")
+            depth1 = self.dec(f1, rgb1.shape[-2:])[0]
+            rel = self.posehead(f0[self._plevel], f1[self._plevel], depth0, depth1, k)
+            xi = torch.zeros(rgb0.shape[0], 6, device=rgb0.device, dtype=depth0.dtype)  # placeholder (pose is geometric)
+            return {"depth0": depth0, "logvar0": logvar0, "xi": xi, "rel_pose": rel}
+        if self.pose_head == "corr":
+            xi = self.posehead(f0[self._plevel], f1[self._plevel])
+        else:
+            xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
         return {"depth0": depth0, "logvar0": logvar0, "xi": xi, "rel_pose": se3_exp(xi)}

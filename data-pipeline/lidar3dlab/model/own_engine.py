@@ -258,7 +258,8 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         for i in range(n):
             t0 = torch.from_numpy(rgbs[i].transpose(2, 0, 1))[None].to(device)
             t1 = torch.from_numpy(rgbs[min(i + 1, n - 1)].transpose(2, 0, 1))[None].to(device)
-            out = model(t0, t1)
+            kt = torch.from_numpy(np.ascontiguousarray(K, np.float32))[None].to(device)  # for the geometric pose head
+            out = model(t0, t1, k=kt)
             depths.append(out["depth0"][0, 0].float().cpu().numpy())
             confs.append(np.exp(-out["logvar0"][0, 0].float().cpu().numpy()))  # aleatoric confidence (high=reliable)
             model_rels.append(out["rel_pose"][0].float().cpu().numpy())        # maps frame i+1 -> frame i

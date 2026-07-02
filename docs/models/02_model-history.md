@@ -31,14 +31,19 @@ household` sequence (~300 pairs), aligned with Umeyama; lower is better. The mac
 | R6 | **best recovery run** | retrain the Siamese head on the winning 4-seq TUM subset + ICL (11k pairs), 12 epochs | **0.28 m** held-out ATE (beats the old 0.37 m); the best OWN model to date | **yes (LIVE, M8)** |
 | R7 | **frozen DINOv2 ViT-B backbone** (DepthAnything recipe: DINOv2 + DPT decoder) | 89.6 M total / **only 3.0 M trainable / 0.65 GB VRAM** (proves 8 GB is NOT the constraint) | pose ATE 0.61 m (worse, head-limited) but **depth-AbsRel 0.22 vs the ResNet's 0.38 = 42 % better DEPTH** (measured with the new metric) | archived; depth-superior |
 | R8 | **M-A: DINOv2 depth + D1 global pose-graph** | bake with the better depth + the global pose-graph, no new training | did NOT give a clean surface: the 0.61 m raw-pose init is too poor for the global BA, which over-constrained (359 loop edges, path blew up to 7 m) | no |
+| R9 | **M-B: single-pair differentiable geometric pose** | a metric-depth-seeded geometric pose head (soft 3D correspondences -> weighted Procrustes/SVD, `pose_head=geo`); frozen depth, only 0.08 M trainable | **NEGATIVE**: the per-pair pose loss dropped to 0.009 (good LOCAL pose) but the accumulated ATE was **1.21 m** (far worse than the regression 0.28 m). Single-pair geometry accumulates coherent per-pair bias | archived, not deployed |
 
 **Decisive finding (the point of the whole exploration).** With a proper DEPTH metric we could finally see it:
-a bigger/frozen backbone (DINOv2) improves **depth by 42 %**, but the trajectory ATE is capped by the **regression
-pose head** regardless of backbone or data, and better depth + post-hoc global optimization (M-A) does NOT fix it.
-This is exactly why the state of the art (DROID-SLAM, DPVO, DINO-VO) builds pose from a **differentiable
-bundle-adjustment** layer, not a regression head. The finding is architectural: on modest hardware, 8 GB is not the
-constraint and depth is cheap to improve; the trajectory is limited by the pose estimator's lack of a geometric
-constraint.
+a bigger/frozen backbone (DINOv2) improves **depth by 42 %**, but the trajectory ATE is **capped by the per-pair
+accumulation**, not the backbone, the data, or even the pose-head family: regression 0.28 m, correlation 0.63 m,
+DINOv2 0.61 m, single-pair geometry (M-B) 1.21 m. Every per-pair estimator, however good locally (M-B's per-pair loss
+hit 0.009), drifts because small per-pair errors accumulate coherently over the trajectory. This is exactly why the
+state of the art (DROID-SLAM, DPVO, DINO-VO) does **multi-frame bundle adjustment** (jointly optimizing a window of
+poses for global consistency), not single-pair estimation. On modest hardware 8 GB is not the constraint and depth is
+cheap; the trajectory needs **joint multi-frame optimization**. The building blocks are in place (a validated
+differentiable Procrustes/BA core, metric-depth seeding, the inference-time ICP + global pose-graph); the next step is
+**M-C: a windowed multi-frame differentiable BA** (DPVO-lite). Note: the deployed regression + inference-ICP model
+(M8, 0.28 m) remains the practical best for the per-pair approach.
 
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
