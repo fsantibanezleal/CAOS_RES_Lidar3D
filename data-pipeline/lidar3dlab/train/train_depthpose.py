@@ -146,8 +146,10 @@ def main() -> None:
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
     ap.add_argument("--seqs", type=str, default="", help="comma-separated substrings; keep only matching TUM train sequences (e.g. 'freiburg1_desk,freiburg1_xyz'). Empty = all discovered")
-    ap.add_argument("--backbone", choices=["scratch", "resnet18"], default="scratch",
-                    help="encoder: from-scratch UNet (desde cero) or a pretrained ImageNet ResNet-18 (sharper depth)")
+    ap.add_argument("--backbone", choices=["scratch", "resnet18", "dinov2_vits14", "dinov2_vitb14", "dinov2_vitl14"],
+                    default="scratch",
+                    help="encoder: from-scratch UNet, a pretrained ImageNet ResNet-18, or a FROZEN DINOv2 foundation "
+                         "backbone (vits/vitb/vitl) with a DPT-style decoder (lingbot-class features; fits 8 GB frozen)")
     ap.add_argument("--pose_head", choices=["siamese", "corr"], default="siamese",
                     help="pose front-end: global-pooled Siamese MLP, or a local correlation cost volume (better pose)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")

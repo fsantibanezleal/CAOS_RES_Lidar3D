@@ -203,17 +203,80 @@ class CorrPoseHead(nn.Module):
         return self.head(x)
 
 
+class DinoV2Encoder(nn.Module):
+    """A FROZEN DINOv2 ViT backbone (the same foundation-model family lingbot-map uses). Returns N intermediate
+    patch-token feature maps [B, C, h, w] for a DPT-style depth decoder. Frozen means no gradients and no optimizer
+    state, so even ViT-Base (86 M) / ViT-Large (300 M) train within an 8 GB budget: only the small decoder + pose
+    head are trained. Weights are fetched once via torch.hub and cached."""
+
+    def __init__(self, name: str = "dinov2_vitb14", layers: tuple = (2, 5, 8, 11)):
+        super().__init__()
+        self.vit = torch.hub.load("facebookresearch/dinov2", name, verbose=False)
+        for p in self.vit.parameters():
+            p.requires_grad_(False)
+        self.vit.eval()
+        self.embed_dim = int(self.vit.embed_dim)
+        self.patch = int(self.vit.patch_size)
+        self.layers = list(layers)
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        self.vit.eval()                                    # the backbone stays frozen/eval regardless
+        return self
+
+    def forward(self, rgb: torch.Tensor) -> list[torch.Tensor]:
+        with torch.no_grad():                              # no gradients through the frozen backbone
+            x = (rgb - self.mean) / self.std               # ImageNet normalisation
+            feats = self.vit.get_intermediate_layers(x, n=self.layers, reshape=True)
+        return [f.float() for f in feats]
+
+
+class DinoDepthDecoder(nn.Module):
+    """DPT-style depth head over the frozen DINOv2 feature levels (this is the DepthAnything recipe: DINOv2 + a
+    convolutional reassemble/fuse decoder). Projects each semantic level, fuses them, then progressively upsamples to
+    the input resolution; emits metric depth + aleatoric log-variance."""
+
+    def __init__(self, embed_dim: int = 768, n_levels: int = 4, base: int = 64, max_depth: float = 10.0):
+        super().__init__()
+        self.max_depth = max_depth
+        self.proj = nn.ModuleList([conv(embed_dim, base) for _ in range(n_levels)])
+        self.fuse = nn.Sequential(conv(base * n_levels, base * 2), conv(base * 2, base * 2))
+        self.up = nn.ModuleList([                           # 16 -> 32 -> 64 -> 128 (then interpolate to input)
+            nn.Sequential(conv(base * 2, base * 2), conv(base * 2, base)),
+            nn.Sequential(conv(base, base), conv(base, base)),
+            nn.Sequential(conv(base, base), conv(base, base // 2)),
+        ])
+        self.head = nn.Conv2d(base // 2, 2, 1)
+
+    def forward(self, feats: list[torch.Tensor], out_hw: tuple) -> tuple:
+        x = torch.cat([p(f) for p, f in zip(self.proj, feats)], 1)
+        x = self.fuse(x)
+        for blk in self.up:
+            x = blk(F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False))
+        x = F.interpolate(x, size=out_hw, mode="bilinear", align_corners=False)
+        h = self.head(x)
+        return self.max_depth * torch.sigmoid(h[:, :1]), h[:, 1:].clamp(-8, 8)
+
+
 class OwnDepthPose(nn.Module):
-    """The full model: per-frame depth+conf and pairwise relative pose. Two interchangeable backbones behind one
-    forward signature: "scratch" (DepthNet + PoseNet, zero external weights) or "resnet18" (ImageNet encoder
-    shared by DepthDecoder + SiamesePoseHead). Everything but the ResNet features is ours."""
+    """The full model: per-frame depth+conf and pairwise relative pose. Interchangeable backbones behind one forward
+    signature: "scratch" (DepthNet + PoseNet, zero external weights), "resnet18" (ImageNet ResNet shared by
+    DepthDecoder + SiamesePoseHead), or "dinov2_vitb14"/"dinov2_vits14"/"dinov2_vitl14" (a FROZEN DINOv2 foundation
+    backbone + a DPT-style DinoDepthDecoder + Siamese pose). Everything but the frozen backbone features is ours."""
 
     def __init__(self, base: int = 32, max_depth: float = 10.0, backbone: str = "scratch",
                  pretrained: bool = True, pose_head: str = "siamese"):
         super().__init__()
         self.backbone = backbone
         self.pose_head = pose_head
-        if backbone == "resnet18":
+        if backbone.startswith("dinov2"):
+            self.enc = DinoV2Encoder(name=backbone)
+            self.dec = DinoDepthDecoder(self.enc.embed_dim, n_levels=len(self.enc.layers),
+                                        base=max(base, 64), max_depth=max_depth)
+            self.posehead = SiamesePoseHead(self.enc.embed_dim)
+        elif backbone == "resnet18":
             self.enc = PretrainedEncoder(pretrained=pretrained)
             self.dec = DepthDecoder(self.enc.out_ch, base, max_depth)
             if pose_head == "corr":
@@ -225,7 +288,12 @@ class OwnDepthPose(nn.Module):
             self.pose = PoseNet()
 
     def forward(self, rgb0: torch.Tensor, rgb1: torch.Tensor) -> dict:
-        if self.backbone == "resnet18":
+        if self.backbone.startswith("dinov2"):
+            f0 = self.enc(rgb0)
+            f1 = self.enc(rgb1)
+            depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
+            xi = self.posehead(f0[-1].mean((-2, -1)), f1[-1].mean((-2, -1)))
+        elif self.backbone == "resnet18":
             f0 = self.enc(rgb0)
             f1 = self.enc(rgb1)
             depth0, logvar0 = self.dec(f0, rgb0.shape[-2:])
