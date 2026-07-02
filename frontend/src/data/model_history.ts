@@ -61,7 +61,14 @@ export const MODEL_HISTORY: ModelRun[] = [
     id: 'M8', run: 'best recovery run (v0.12.001, LIVE)', backbone: 'resnet18',
     data: 'TUM RGB-D (winning 4-seq subset) + ICL-NUIM, 11k pairs',
     ate: '0.28', deployed: 'live',
-    notes_en: 'The best OWN model to date: same ResNet-18 + Siamese architecture, retrained (12 epochs) after experiments confirmed the architectural ceiling. Best held-out ATE 0.28 m (beats M7 0.37 m). Deployed across all 8 OWN scenes with the ICP refinement ladder. Negative results along the way (correlation pose head, more-data-11-seq) are kept in the record; the global-pose-graph (D1) + TSDF stack is implemented and one flag away, awaiting sub-voxel poses.',
-    notes_es: 'El mejor modelo OWN hasta ahora: misma arquitectura ResNet-18 + Siamese, reentrenada (12 épocas) tras confirmar el techo arquitectónico. Mejor ATE held-out 0.28 m (supera el 0.37 m de M7). Desplegado en las 8 escenas OWN con el ladder de refinamiento ICP. Los resultados negativos (cabeza de correlación, más-datos-11-seq) quedan en el registro; el stack pose-graph global (D1) + TSDF está implementado a un flag, esperando poses sub-vóxel.',
+    notes_en: 'The deployed OWN model: ResNet-18 + Siamese, best held-out ATE 0.28 m (beats M7 0.37 m). Deployed across all 8 OWN scenes with the ICP refinement ladder. Negative results (correlation pose head, more-data-11-seq) kept in the record.',
+    notes_es: 'El modelo OWN desplegado: ResNet-18 + Siamese, mejor ATE held-out 0.28 m (supera el 0.37 m de M7). Desplegado en las 8 escenas OWN con el ladder de refinamiento ICP. Los resultados negativos (cabeza de correlación, más-datos-11-seq) quedan en el registro.',
+  },
+  {
+    id: 'M9', run: 'frozen DINOv2 ViT-B (DepthAnything recipe)', backbone: 'resnet18',
+    data: 'TUM RGB-D (4-seq) + ICL-NUIM, 11k pairs',
+    ate: '0.61', deployed: 'no',
+    notes_en: 'Frozen DINOv2 ViT-B + a DPT-style decoder (the same foundation-backbone family the reference SOTA uses): 89.6 M total but only 3.0 M trainable at 0.65 GB VRAM, proving 8 GB is NOT the constraint. Measured with a new depth metric: depth-AbsRel 0.22 vs the ResNet 0.38 = 42% BETTER DEPTH. But the pose ATE (0.61 m) is worse: the trajectory is capped by the REGRESSION pose head, not the backbone. Post-hoc global bundle adjustment on that pose (M-A) did not clean the map. The honest finding: on modest hardware depth is cheap and pose is the bottleneck; the next lever is a geometric (differentiable-BA) pose, not more capacity.',
+    notes_es: 'DINOv2 ViT-B congelado + decoder estilo DPT (la misma familia de backbone fundacional que usa el SOTA de referencia): 89.6 M totales pero solo 3.0 M entrenables a 0.65 GB de VRAM, probando que los 8 GB NO son el límite. Medido con una métrica de depth nueva: depth-AbsRel 0.22 vs 0.38 del ResNet = 42% MEJOR DEPTH. Pero el ATE de pose (0.61 m) es peor: la trayectoria la limita la cabeza de pose de REGRESIÓN, no el backbone. El bundle adjustment global post-hoc sobre esa pose (M-A) no limpió el mapa. El hallazgo honesto: en hardware modesto el depth es barato y la pose es el cuello de botella; el siguiente lever es una pose geométrica (BA diferenciable), no más capacidad.',
   },
 ];
