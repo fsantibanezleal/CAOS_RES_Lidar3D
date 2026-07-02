@@ -18,7 +18,8 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from ..model.nets.own_depthpose import OwnDepthPose
-from .dataset_tum import ICLPairs, TUMPairs, icl_sequences, list_sequences
+from .dataset_tum import (ICLPairs, TartanGroundPairs, TUMPairs, icl_sequences, list_sequences,
+                          tartanground_sequences)
 
 
 def depth_loss(pred: torch.Tensor, logvar: torch.Tensor, gt: torch.Tensor, max_depth: float) -> torch.Tensor:
@@ -145,6 +146,7 @@ def main() -> None:
     ap.add_argument("--base", type=int, default=32, help="model width (channels); bigger = more capacity")
     ap.add_argument("--smooth_w", type=float, default=0.0, help="edge-aware depth smoothness weight (0=off)")
     ap.add_argument("--use_icl", action="store_true", help="also train on ICL-NUIM (synthetic, perfect GT depth)")
+    ap.add_argument("--use_tartan", action="store_true", help="also train on TartanGround (synthetic, perfect depth+pose; far/sky masked to the model's range)")
     ap.add_argument("--seqs", type=str, default="", help="comma-separated substrings; keep only matching TUM train sequences (e.g. 'freiburg1_desk,freiburg1_xyz'). Empty = all discovered")
     ap.add_argument("--backbone", choices=["scratch", "resnet18", "dinov2_vits14", "dinov2_vitb14", "dinov2_vitl14"],
                     default="scratch",
@@ -172,6 +174,8 @@ def main() -> None:
     datasets: list = [TUMPairs(s, image_size=args.size, max_pairs=mp) for s in train_seqs]
     if args.use_icl:
         datasets += [ICLPairs(s, image_size=args.size, max_pairs=mp) for s in icl_sequences()]
+    if args.use_tartan:
+        datasets += [TartanGroundPairs(s, image_size=args.size, max_pairs=mp) for s in tartanground_sequences()]
     train = ConcatDataset(datasets)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
 

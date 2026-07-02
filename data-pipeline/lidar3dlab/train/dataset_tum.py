@@ -169,3 +169,72 @@ def icl_sequences() -> list[str]:
     """ICL-NUIM sequences (a folder with associations.txt + a *.gt.freiburg)."""
     root = Path(os.environ.get("LIDAR3D_DATA_ROOT", "data/raw")) / "train" / "icl-nuim"
     return sorted(str(p.parent) for p in root.rglob("associations.txt"))
+
+
+# TartanGround camera-optical <- NED body change of basis: optical (x-right, y-down, z-forward) axes expressed in
+# the NED body frame (x-forward, y-right, z-down): opt_x->ned_y, opt_y->ned_z, opt_z->ned_x.
+_NED_FROM_OPT = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]], np.float64)
+
+
+class TartanGroundPairs(Dataset):
+    """TartanGround (TartanAir v2 ground-robot) pairs: RGB + PERFECT synthetic depth + pose, huge and diverse.
+    Format per trajectory: image_<cam>/######_<cam>.png, depth_<cam>/######_<cam>_depth.png (RGBA bytes = a float32
+    metric depth), pose_<cam>.txt (x y z qx qy qz qw, camera-to-world in NED). Cameras are 640x640, 90 deg FoV
+    (fx=fy=320, cx=cy=320). Poses are converted NED->optical so they compose with our optical-frame depth; depths
+    beyond `max_depth` (sky / far outdoor) are masked invalid so they do not corrupt an indoor-range model."""
+
+    def __init__(self, seq_dir: str, image_size: int = 224, stride: int = 1, max_pairs: int | None = None,
+                 camera: str = "lcam_front", max_depth: float = 10.0):
+        self.seq_dir = Path(seq_dir)
+        self.size = image_size
+        self.max_depth = max_depth
+        self.img_dir = self.seq_dir / f"image_{camera}"
+        self.dep_dir = self.seq_dir / f"depth_{camera}"
+        imgs = sorted(self.img_dir.glob(f"*_{camera}.png"))
+        poses = np.loadtxt(self.seq_dir / f"pose_{camera}.txt").reshape(-1, 7)
+        frames = []
+        for i, ip in enumerate(imgs):
+            if i >= len(poses):
+                break
+            dp = self.dep_dir / (ip.stem + "_depth.png")
+            if not dp.exists():
+                continue
+            c2w = np.eye(4)
+            c2w[:3, :3] = Rotation.from_quat(poses[i, 3:7]).as_matrix()
+            c2w[:3, 3] = poses[i, :3]
+            frames.append((str(ip), str(dp), c2w))
+        fx = fy = 320.0 * (image_size / 640.0)
+        cx = cy = 320.0 * (image_size / 640.0)
+        self.K0 = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], np.float32)   # already at working res
+        self.samples = [(frames[i], frames[i + stride]) for i in range(0, len(frames) - stride, stride)]
+        if max_pairs:
+            self.samples = self.samples[:max_pairs]
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def _rgb(self, p: str) -> np.ndarray:
+        im = Image.open(p).convert("RGB").resize((self.size, self.size), Image.BILINEAR)
+        return (np.asarray(im, np.float32) / 255.0).transpose(2, 0, 1)
+
+    def _depth(self, p: str) -> np.ndarray:
+        rgba = np.asarray(Image.open(p))                       # (H,W,4) uint8; the 4 bytes ARE a float32 metre depth
+        d = np.ascontiguousarray(rgba).view(np.float32).squeeze(-1)
+        d = np.array(Image.fromarray(d).resize((self.size, self.size), Image.NEAREST), np.float32)
+        d[d >= self.max_depth] = 0.0                           # mask sky/far so an indoor-range model is not corrupted
+        return d
+
+    def __getitem__(self, i: int) -> dict:
+        (ip0, dp0, c2w0), (ip1, _dp1, c2w1) = self.samples[i]
+        rel_ned = np.linalg.inv(c2w0) @ c2w1                   # relative pose, NED frame
+        p = np.eye(4)
+        p[:3, :3] = _NED_FROM_OPT
+        rel = (p.T @ rel_ned @ p).astype(np.float32)           # -> optical frame (matches our depth unprojection)
+        return {"rgb0": self._rgb(ip0), "rgb1": self._rgb(ip1),
+                "depth0": self._depth(dp0), "rel_pose": rel, "K": self.K0.copy()}
+
+
+def tartanground_sequences() -> list[str]:
+    """TartanGround trajectory folders (a dir holding image_<cam>/, depth_<cam>/ and pose_<cam>.txt)."""
+    root = Path(os.environ.get("LIDAR3D_DATA_ROOT", "data/raw")) / "train" / "tartanground"
+    return sorted(str(p.parent) for p in root.rglob("pose_lcam_front.txt"))
