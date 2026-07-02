@@ -58,13 +58,18 @@ Each deployed case shows its dataset + license in the App's reconstruction stats
 
 ## Bigger data (roadmap)
 
-The classic benchmarks above are small. The real lever for pose accuracy (which bounds a clean fused surface) is more,
-broader data. Candidates:
+The classic benchmarks above are small. The real lever is more, broader data **paired with more model capacity**
+(a frozen DINOv2 backbone; see [models/01](01_own-depth-pose.md)) — note that adding TUM 5→11 sequences alone did
+NOT help the tiny model (it saturated). Candidate bigger sets, with their real download friction (verified):
 
-- **TartanAir** — huge synthetic VO/SLAM set with perfect depth + pose; needs the official `tartanair_tools`
-  downloader (Azure blob / SAS), not a direct download.
-- **ScanNet / ScanNet++** — large real indoor RGB-D; needs a signed terms-of-use agreement.
-- **ARKitScenes** — very large real indoor with iPhone LiDAR; downloadable via Apple's script.
+- **TartanAir** — huge synthetic VO/SLAM set with perfect depth + pose; the best fit. BUT: no pip package, the Azure
+  blob container is not publicly listable, and the main HuggingFace mirror is **gated (manual approval)**. Needs
+  `azcopy` + the official file list, or an approved HF token. Not an automated download.
+- **ScanNet / ScanNet++** — large real indoor RGB-D; needs a **signed terms-of-use** agreement (email).
+- **ARKitScenes** — very large real indoor with iPhone LiDAR; downloadable via Apple's script (S3), no gating.
+- **more ICL-NUIM** (office/living-room traj 0–3) — direct URLs from the ICL site; synthetic perfect depth; the
+  most friction-free way to add clean data (needs generating `associations.txt` per trajectory).
 
 Adding any of these means a small loader (their pose/depth formats differ from TUM) plus a retrain; see the training
-guide. The append-only experiments log keeps every run, so scaling data is a tracked, reversible experiment.
+guide. The append-only experiments log keeps every run, so scaling data is a tracked, reversible experiment. Given
+the frozen-backbone model trains at ~0.65 GB on 8 GB, capacity is not the constraint — labelled data volume is.
