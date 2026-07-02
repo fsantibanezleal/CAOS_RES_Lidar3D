@@ -1,7 +1,7 @@
 # scripts/ — environment + pipeline orchestration (cross-platform)
 
 Local scripts so **anyone** can configure the env and run the flow. Provide every script in BOTH `*.sh`
-(macOS/Linux/Git-Bash) and `*.ps1` (Windows PowerShell, since Felipe runs PS).
+(macOS/Linux/Git-Bash) and `*.ps1` (Windows PowerShell, since the primary environment is PowerShell).
 
 ## How to populate
 

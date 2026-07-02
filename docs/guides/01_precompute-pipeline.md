@@ -13,7 +13,7 @@ The heavy engine (torch + a 4.6 GB checkpoint + a CUDA GPU) is isolated; the syn
 it. Use the repo's isolated envs (never a global interpreter):
 
 ```bash
-scripts/setup.ps1          # Windows (Felipe's default); or: bash scripts/setup.sh
+scripts/setup.ps1          # Windows; or: bash scripts/setup.sh
 ```
 
 This builds the Python 3.12 `.venv` (+ the pipeline env), installs the deps, and installs the package

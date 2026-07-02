@@ -35,9 +35,10 @@ household` sequence (~300 pairs), aligned with Umeyama; lower is better. The mac
 **Decisive finding (the point of the whole exploration).** With a proper DEPTH metric we could finally see it:
 a bigger/frozen backbone (DINOv2) improves **depth by 42 %**, but the trajectory ATE is capped by the **regression
 pose head** regardless of backbone or data, and better depth + post-hoc global optimization (M-A) does NOT fix it.
-This is exactly why SOTA (DROID-SLAM, DPVO, DINO-VO) builds pose from a **differentiable bundle-adjustment** layer,
-not regression. The validated next lever is a differentiable-BA pose head seeded by our metric depth (plan:
-`wip/lidar3d/plan-differentiable-ba-pose.md`, M-B). 8 GB is not the constraint; the pose ARCHITECTURE is.
+This is exactly why the state of the art (DROID-SLAM, DPVO, DINO-VO) builds pose from a **differentiable
+bundle-adjustment** layer, not a regression head. The finding is architectural: on modest hardware, 8 GB is not the
+constraint and depth is cheap to improve; the trajectory is limited by the pose estimator's lack of a geometric
+constraint.
 
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m

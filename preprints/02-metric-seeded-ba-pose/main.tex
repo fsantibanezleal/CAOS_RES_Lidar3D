@@ -1,0 +1,43 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\title{\textbf{Metric-Depth-Seeded Differentiable Bundle Adjustment\\ for Monocular Visual Odometry on Modest Hardware}}
+\author{CAOS Research Lab}
+\date{Proposal draft, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A regression pose head has no geometric constraint and drifts; accurate learned VO (DROID-SLAM, DPVO, DINO-VO)
+instead solves pose with a \emph{differentiable bundle-adjustment} (BA) layer. Monocular BA is scale-ambiguous and
+ill-posed at initialization. We propose to \textbf{seed the BA with our network's metric depth}, which fixes the
+scale from the first iteration and makes the problem well-posed, and to keep it \textbf{sparse} so it runs and trains
+on an 8\,GB laptop GPU. This is a proposal manuscript; the empirical baseline and the negative results that motivate
+it are in the companion \texttt{01-lidar3d-system}.
+\end{abstract}
+
+\section{Motivation}
+Measured on our system: a frozen DINOv2 backbone lowers depth AbsRel by 42\% but the trajectory ATE is unchanged
+($\sim$0.28--0.61\,m) across backbones, pose-head variants, and training data; post-hoc global BA on a poor
+regression init over-constrains and does not clean the map. The limitation is the pose \emph{estimator}, not
+capacity or data.
+
+\section{Method (proposed)}
+\textbf{(i) Sparse correspondences} from the frozen features (patch sampler + a small correlation/update operator).
+\textbf{(ii) Metric-depth lift:} unproject the corresponded pixels with the predicted metric depth and the known
+intrinsics to 3D. \textbf{(iii) Differentiable solve:} a weighted alignment / Gauss-Newton step over
+$SE(3)\oplus$ inverse-depth minimizing the reprojection residual; backpropagate through the linear solve.
+\textbf{(iv) Multi-frame:} a small keyframe patch graph (DPVO-lite) for a windowed BA; optional CPU proximity loop
+closure feeding the existing pose-graph + TSDF fusion.
+
+\section{Why it is feasible + novel}
+The backbone is frozen ($\sim$4--8\,M trainable), sparse BA is laptop-scale (cf.\ DPVO $\sim$5\,GB), and the metric
+prior is the differentiator: it removes monocular scale ambiguity so BA is well-posed at iteration zero, unlike
+scale-free monocular BA. Trained with the pose + reprojection loss on synthetic perfect-depth+pose data
+(TartanAir/TartanGround) and evaluated held-out on TUM.
+
+\section*{Status}
+Proposal. Full derivation, implementation, and results to be completed; tracked as a work item.
+\end{document}
