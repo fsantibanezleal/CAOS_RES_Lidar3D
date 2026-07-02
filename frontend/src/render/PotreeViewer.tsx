@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Potree, PointColorType } from 'potree-core';
-import type { Trace } from '../lib/contract.types';
+import { b64ToF32, type Trace } from '../lib/contract.types';
 import type { CameraMode, ColorMode } from './CloudViewer';
 
 // map our color toggle to a Potree material color source (RGB baked colors vs a height/elevation ramp).
@@ -78,6 +78,17 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colo
       a.camera.position.copy(c.clone().add(new THREE.Vector3(0.5, 0.45, 1).normalize().multiplyScalar(r * 2.2)));
       a.controls.minDistance = r * 0.02; a.controls.maxDistance = r * 12;
       a.controls.update();
+      // trajectory centers/forwards from the trace (same OpenCV->render transform as three.js/deck.gl), so Potree
+      // supports first-person too (positions the camera along the reconstructed path).
+      const poses = b64ToF32(trace.poses_b64); const S = (poses.length / 12) | 0;
+      const centers: THREE.Vector3[] = [], fwds: THREE.Vector3[] = [];
+      for (let i = 0; i < S; i++) {
+        const p = poses.subarray(i * 12, i * 12 + 12);
+        centers.push(new THREE.Vector3(p[3], -p[7], -p[11]));
+        fwds.push(new THREE.Vector3(p[2], -p[6], -p[10]).normalize());
+      }
+      a.centers = centers; a.fwds = fwds; a.bbCenter = c; a.bbR = r;
+      placeCamera();
     }).catch((e: unknown) => { console.error('potree load', e); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,17 +107,27 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colo
     a.pco.material.needsUpdate = true;
   }, [colorMode]);
 
-  // top / orbit camera framing (Potree keeps the LOD; first-person is not meaningful for a static octree)
-  useEffect(() => {
-    const a = api.current; if (!a || !a.pco) return;
-    const bb: THREE.Box3 = a.pco.boundingBox ? a.pco.boundingBox.clone().applyMatrix4(a.pco.matrixWorld) : new THREE.Box3().setFromObject(a.pco);
-    const c = bb.getCenter(new THREE.Vector3());
-    const r = Math.max(bb.getSize(new THREE.Vector3()).length() * 0.5, 0.5);
-    a.controls.target.copy(c);
-    const dir = cameraMode === 'top' ? new THREE.Vector3(0.001, 1, 0.001) : new THREE.Vector3(0.5, 0.45, 1);
-    a.camera.position.copy(c.clone().add(dir.normalize().multiplyScalar(r * 2.2)));
+  // orbit / top / FIRST-PERSON framing (first-person places the camera on the reconstructed trajectory, matching
+  // three.js/surfels; the octree stays static, but the camera can now stand inside the map and look along the path)
+  const placeCamera = () => {
+    const a = api.current; if (!a || !a.pco || !a.bbCenter) return;
+    const c: THREE.Vector3 = a.bbCenter, r: number = a.bbR;
+    if (cameraMode === 'first' && a.centers?.length) {
+      const pos: THREE.Vector3 = a.centers[a.centers.length - 1];
+      const fwd: THREE.Vector3 = a.fwds[a.fwds.length - 1] || new THREE.Vector3(0, 0, 1);
+      a.controls.target.copy(pos.clone().addScaledVector(fwd, Math.max(r * 0.3, 0.3)));   // look ahead along the path
+      a.camera.position.copy(pos);
+      a.controls.minDistance = 0.01; a.controls.maxDistance = r * 12;
+    } else {
+      a.controls.target.copy(c);
+      const dir = cameraMode === 'top' ? new THREE.Vector3(0.001, 1, 0.001) : new THREE.Vector3(0.5, 0.45, 1);
+      a.camera.position.copy(c.clone().add(dir.normalize().multiplyScalar(r * 2.2)));
+      a.controls.minDistance = r * 0.02; a.controls.maxDistance = r * 12;
+    }
     a.controls.update();
-  }, [cameraMode]);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(placeCamera, [cameraMode]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 420, background: dark ? '#0b1020' : '#eef2f8' }} />;
 }
