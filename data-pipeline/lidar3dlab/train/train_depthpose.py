@@ -165,6 +165,7 @@ def main() -> None:
     ap.add_argument("--pose_head", choices=["siamese", "corr", "geo"], default="siamese",
                     help="pose front-end: Siamese MLP, a correlation cost volume, or 'geo' (metric-depth-seeded differentiable geometric pose, M-B)")
     ap.add_argument("--init", type=str, default="", help="warm-start: load matching weights from a checkpoint (e.g. reuse a good depth net when training a new pose head)")
+    ap.add_argument("--freeze_depth", action="store_true", help="freeze backbone+depth decoder, train ONLY the pose head (stable; isolates a geometric pose on a fixed good depth)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
     args = ap.parse_args()
 
@@ -195,7 +196,12 @@ def main() -> None:
     if args.init:                                          # warm-start (e.g. reuse a trained depth net for a geo pose run)
         miss, unexp = model.load_state_dict(torch.load(args.init, map_location="cpu")["model"], strict=False)
         print(f"warm-started from {os.path.basename(args.init)} (missing={len(miss)}, unexpected={len(unexp)})")
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    if args.freeze_depth:                                  # train only the pose head on a fixed good depth
+        for nm, p in model.named_parameters():
+            if "posehead" not in nm:
+                p.requires_grad_(False)
+        print(f"froze depth+backbone; trainable = {sum(p.numel() for p in model.parameters() if p.requires_grad)/1e6:.2f}M (pose head)")
+    opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
     print(f"device={device} dtype={dtype} train_pairs={len(train)} val={os.path.basename(val_seq)} "
           f"params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")

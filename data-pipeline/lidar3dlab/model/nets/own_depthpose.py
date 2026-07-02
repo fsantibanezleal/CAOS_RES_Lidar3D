@@ -326,12 +326,14 @@ class GeoPoseHead(nn.Module):
         gx = (xs.flatten().float() + 0.5) * (wi / w)                  # grid -> image pixels
         gy = (ys.flatten().float() + 0.5) * (hi / h)
         grid = torch.stack([gx, gy], -1)[None].expand(b, -1, -1)      # [B,N,2] pixel coords of the frame grid
-        p0px = grid
-        p1px = attn @ grid                                            # soft-corresponded frame1 pixel per frame0 pt
-        d0s = _sample_at(d0, p0px).clamp(min=1e-3)
-        d1s = _sample_at(d1, p1px).clamp(min=1e-3)
-        p0 = _unproject_px(p0px, d0s, k)
-        p1 = _unproject_px(p1px, d1s, k)
+        # frame-0 points: lift the grid by its depth. frame-1 target: lift EVERY grid point to 3D, then take the
+        # soft (attention-weighted) average IN 3D. Averaging 3D points (not pixels-then-sample) is geometrically
+        # sound for a diffuse softmax, and it is the differentiable soft-correspondence a BA step consumes.
+        d0s = _sample_at(d0, grid).clamp(min=1e-3)
+        d1g = _sample_at(d1, grid).clamp(min=1e-3)
+        p0 = _unproject_px(grid, d0s, k)                              # [B,N,3] frame-0 3D points
+        p1_all = _unproject_px(grid, d1g, k)                          # [B,N,3] frame-1 3D points (all grid)
+        p1 = attn @ p1_all                                            # [B,N,3] soft 3D correspondence per frame-0 pt
         conf = self.conf(f0).flatten(2).squeeze(1).sigmoid() * attn.max(-1).values   # descriptor conf x match peak
         t01 = weighted_procrustes(p0, p1, conf + 1e-4)               # frame0 -> frame1
         return torch.linalg.inv(t01)                                 # our convention: rel maps frame1 -> frame0
