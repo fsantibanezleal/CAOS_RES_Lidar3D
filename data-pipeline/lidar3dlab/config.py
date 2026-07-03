@@ -1,7 +1,7 @@
 """Runtime paths from the ENVIRONMENT (no personal paths are ever versioned).
 
-Real values come from a gitignored `.env` provisioned from `_CAOS_MANAGE/credentials/app-env/lidar3d.env`;
-`.env.example` carries generic placeholders. If unset, paths fall back to repo-relative defaults and the
+Real values come from a gitignored `.env` (see `.env.example` for the generic placeholders); the app never
+versions personal paths. If unset, paths fall back to repo-relative defaults and the
 ingestion contract simply REJECTS a missing source (clean), so nothing crashes at import.
 """
 from __future__ import annotations

@@ -9,7 +9,8 @@ from lidar3dlab.model import geom
 def test_project_unproject_roundtrip_and_forward():
     # a known ground-truth cube, placed IN FRONT of a camera at the origin (z = 4..6)
     g = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (4.0, 6.0)], np.float64)
-    eye = np.array([0.0, 0.0, 0.0]); target = np.array([0.0, 0.0, 5.0])
+    eye = np.array([0.0, 0.0, 0.0])
+    target = np.array([0.0, 0.0, 5.0])
     c2w = geom.look_at(eye, target)
     K = geom.intrinsics_from_fov(640, 480, 60.0)
 
