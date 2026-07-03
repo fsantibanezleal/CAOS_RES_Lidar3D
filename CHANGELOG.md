@@ -28,6 +28,42 @@ while on mock/synthetic data. Tag every release.
   axis triad, drawn by every renderer from the shared transform, to compare the coordinate frame across them.
 - `coords.test.ts`: 14 vitest cases for the transform (mapping, handedness, pose, OBB).
 
+## [0.12.001] · 2026-07-02
+
+### Changed
+- Deploy **M8**, the best recovery model: 0.28 m held-out ATE (beats M7's 0.37 m). Re-baked all 8 OWN scenes
+  and their Potree octrees with it, for ~2x higher depth confidence and tighter trajectories.
+
+### Added
+- `--seqs` training filter to reproduce a specific TUM subset (recovers the winning 5-sequence model).
+
+## [0.12.000] · 2026-07-02
+
+### Added
+- Correlation pose head (RAFT/TartanVO-style local cost volume between frame features) as a `--pose_head`
+  option, targeting the pose-accuracy bottleneck that global pooling discards; wired through training /
+  checkpoint / meta / engine.
+- A layer-by-layer architecture reference (encoder/decoder/pose-head shapes, channels, param counts) for both
+  backbones; a local usage guide (train → bake → refinement ladder → add-scene → verify) and a datasets page.
+
+### Changed
+- Benchmark now reflects reality: OUR depth+pose model is in the ladder (LIVE, ~0.37 m held-out ATE), D1
+  loop-closure + TSDF marked IMPLEMENTED. Replaced the template SIR placeholder in `cases/README` with the real
+  14 scenarios (8 OWN, 4 held-out). Documents the R1–R5 experiments incl. the correlation-head negative result.
+
+## [0.11.000] · 2026-07-01
+
+### Added
+- Bake **8 OWN scenes** (240 frames: TUM ×5 + 7-Scenes ×2 + ICL) with a pretrained **ResNet-18** backbone
+  (shared encoder + Siamese pose head), real per-dataset intrinsics, and frame-to-frame point-to-plane **ICP**
+  pose refinement (Open3D) for a sharper fused cloud. Rebuilt the index to 14 cases + Potree octrees.
+- Deep model documentation (architecture, aleatoric depth, Siamese pose, SE(3), ATE) + full model history
+  including negative results, in both the repo and the web Experiments page.
+
+### Fixed
+- Preserve the camera across config/mode changes in all renderers (remember + restore the orbit; only re-fit
+  on a new case). Potree honours the colour toggle and states it renders the full LOD map.
+
 ## [0.10.001] · 2026-07-01
 
 ### Fixed
