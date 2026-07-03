@@ -2,11 +2,16 @@
 // the per-frame observer frustums, all revealed GPU-side by DataFilterExtension (replay costs nothing per
 // frame). Controlled viewState so mouse interaction AND the camera-mode buttons work; the view is preserved on
 // density/color changes and only re-fit on a new case or a camera-mode switch. Same prop interface as CloudViewer.
+//
+// Coordinates: the OpenCV-world -> render-frame transform lives ONLY in lib/coords (worldToRenderBuffer /
+// poseCenter / poseForward / poseApplyToRender), the exact same helpers three.js / surfels / Potree use, so all
+// four renderers agree by construction. The OBB overlay (box + RGB axis triad) is drawn from the same helpers.
 import { useEffect, useRef } from 'react';
 import { COORDINATE_SYSTEM, Deck, OrbitView } from '@deck.gl/core';
 import { LineLayer, PointCloudLayer } from '@deck.gl/layers';
 import { DataFilterExtension } from '@deck.gl/extensions';
 import { b64ToF32, b64ToU8, type Trace } from '../lib/contract.types';
+import { worldToRenderBuffer, poseCenter, poseForward, poseApplyToRender, cloudObbRender, obbAxes, type Vec3 } from '../lib/coords';
 import type { CameraMode, ColorMode } from './CloudViewer';
 
 function ramp(t: number): [number, number, number] {
@@ -15,12 +20,9 @@ function ramp(t: number): [number, number, number] {
   const i = Math.min(3, Math.floor(x)); const f = x - i; const a = seg[i], b = seg[i + 1];
   return [Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)];
 }
-type V3 = [number, number, number];
-const apply = (p: Float32Array, o: number, x: number, y: number, z: number): V3 =>
-  [p[o] * x + p[o + 1] * y + p[o + 2] * z + p[o + 3], p[o + 4] * x + p[o + 5] * y + p[o + 6] * z + p[o + 7], p[o + 8] * x + p[o + 9] * y + p[o + 10] * z + p[o + 11]];
 
-export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean }) {
+export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true, showObb = false }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean; showObb?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<any>(null);
   const vsRef = useRef<any>(null);
@@ -35,40 +37,49 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
     const pAll = b64ToF32(trace.points_b64), cAll = b64ToU8(trace.colors_b64);
     const nAll = (pAll.length / 3) | 0, stride = Math.max(1, Math.round(density));
     const n = Math.ceil(nAll / stride);
-    const pos = new Float32Array(n * 3), col = new Uint8Array(n * 3), fil = new Float32Array(n);
+    // world -> render frame via the shared transform, then read it back for colors + the bounding box.
+    const pos = worldToRenderBuffer(pAll, stride);
+    const col = new Uint8Array(n * 3), fil = new Float32Array(n);
     let lo = Infinity, hi = -Infinity, minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
-    // OpenCV world (X-right, Y-down, Z-forward) -> render frame (x,-y,-z), the SAME transform three.js / surfels /
-    // Potree use, so all four renderers agree exactly (deck.gl was previously (x,-y,z) = a mirror, rendering the
-    // scene in a different orientation than the others).
     for (let i = 0, j = 0; i < nAll; i += stride, j++) {
-      const x = pAll[i * 3], y = -pAll[i * 3 + 1], z = -pAll[i * 3 + 2];
-      pos[j * 3] = x; pos[j * 3 + 1] = y; pos[j * 3 + 2] = z;
+      const x = pos[j * 3], y = pos[j * 3 + 1], z = pos[j * 3 + 2];
       col[j * 3] = cAll[i * 3]; col[j * 3 + 1] = cAll[i * 3 + 1]; col[j * 3 + 2] = cAll[i * 3 + 2]; fil[j] = j;
       if (y < lo) lo = y; if (y > hi) hi = y;
       if (x < minx) minx = x; if (y < miny) miny = y; if (z < minz) minz = z;
       if (x > maxx) maxx = x; if (y > maxy) maxy = y; if (z > maxz) maxz = z;
     }
     if (colorMode === 'depth') { const span = hi - lo || 1; for (let j = 0; j < n; j++) { const [r, g, b] = ramp(1 - (pos[j * 3 + 1] - lo) / span); col[j * 3] = r; col[j * 3 + 1] = g; col[j * 3 + 2] = b; } }
-    const center: V3 = [(minx + maxx) / 2, (miny + maxy) / 2, (minz + maxz) / 2];
+    const center: Vec3 = [(minx + maxx) / 2, (miny + maxy) / 2, (minz + maxz) / 2];
     const radius = Math.max(Math.hypot(maxx - minx, maxy - miny, maxz - minz) * 0.5, 0.5);
 
     // poses -> centers, forwards, trajectory segments, frustum segments (with per-item frame index for reveal)
     const poses = b64ToF32(trace.poses_b64); const S = (poses.length / 12) | 0;
-    const centers: V3[] = [], fwds: V3[] = [];
-    const traj: { s: V3; t: V3; f: number }[] = [], frus: { s: V3; t: V3; f: number }[] = [];
+    const centers: Vec3[] = [], fwds: Vec3[] = [];
+    const traj: { s: Vec3; t: Vec3; f: number }[] = [], frus: { s: Vec3; t: Vec3; f: number }[] = [];
     const off = trace.frame_offsets && trace.frame_offsets.length > 1 ? trace.frame_offsets.map((o) => Math.ceil(o / stride)) : [];
     const sz = Math.max(radius * 0.02, 0.03), dd = sz * 2;
-    const corners: V3[] = [[sz, sz, dd], [sz, -sz, dd], [-sz, -sz, dd], [-sz, sz, dd]];
+    const corners: Vec3[] = [[sz, sz, dd], [sz, -sz, dd], [-sz, -sz, dd], [-sz, sz, dd]]; // camera-local frustum corners
     for (let i = 0; i < S; i++) {
       const o = i * 12;
-      const c: V3 = [poses[o + 3], -poses[o + 7], -poses[o + 11]];  // (x,-y,-z) to match the cloud + the other renderers
+      const c = poseCenter(poses, o);                                        // shared transform (lib/coords)
       centers.push(c);
-      fwds.push([poses[o + 2], -poses[o + 6], -poses[o + 10]]);
-      const cw = corners.map((q) => { const p = apply(poses, o, q[0], q[1], q[2]); return [p[0], -p[1], -p[2]] as V3; });
+      fwds.push(poseForward(poses, o));
+      const cw = corners.map((q) => poseApplyToRender(poses, o, q[0], q[1], q[2])); // pose then world->render, one path
       for (let k = 0; k < 4; k++) { frus.push({ s: c, t: cw[k], f: i }); frus.push({ s: cw[k], t: cw[(k + 1) % 4], f: i }); }
       if (i > 0) traj.push({ s: centers[i - 1], t: c, f: i });
     }
-    data.current = { pos, col, fil, n, center, radius, centers, fwds, traj, frus, off, nFrames: trace.n_frames };
+
+    // OBB diagnostic: box edges + an RGB axis triad, from the same shared helpers, so orientation is directly
+    // comparable to the other renderers. Reuses the strided world points.
+    const obb = cloudObbRender(pAll, stride); const ax = obbAxes(obb);
+    const obbBox = obb.edges.map(([i0, i1]) => ({ s: obb.corners[i0], t: obb.corners[i1] }));
+    const obbAx = [
+      { s: ax.origin, t: ax.x, c: [235, 60, 60] as [number, number, number] },   // +X red
+      { s: ax.origin, t: ax.y, c: [60, 210, 90] as [number, number, number] },    // +Y green
+      { s: ax.origin, t: ax.z, c: [80, 140, 255] as [number, number, number] },   // +Z blue
+    ];
+
+    data.current = { pos, col, fil, n, center, radius, centers, fwds, traj, frus, off, nFrames: trace.n_frames, obbBox, obbAx };
     const isNew = caseRef.current !== trace.case_id;
     caseRef.current = trace.case_id;
     if (isNew) orbitVS.current = null;            // forget the remembered view only when the case actually changes
@@ -79,7 +90,7 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
 
   useEffect(() => { redraw(true); /* re-fit on camera-mode switch */ }, [cameraMode]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { redraw(cameraMode === 'first'); /* FP follows the player; others keep the view */ }, [reveal]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { redraw(false); }, [pointSize, dark, showCones, showTraj]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { redraw(false); }, [pointSize, dark, showCones, showTraj, showObb]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { deckRef.current?.finalize?.(); deckRef.current = null; }, []);
 
   function revealFrames(): number {
@@ -140,6 +151,16 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
         getSourcePosition: (o: any) => o.s, getTargetPosition: (o: any) => o.t, getColor: [51, 214, 166],
         getFilterValue: (o: any) => o.f, filterRange: [0, rf], extensions: ext,
       })] : []),
+      ...(showObb ? [
+        new LineLayer({
+          id: 'obb-box', coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, data: d.obbBox, getWidth: 1.5,
+          getSourcePosition: (o: any) => o.s, getTargetPosition: (o: any) => o.t, getColor: [136, 153, 187],
+        }),
+        new LineLayer({
+          id: 'obb-axes', coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, data: d.obbAx, getWidth: 4,
+          getSourcePosition: (o: any) => o.s, getTargetPosition: (o: any) => o.t, getColor: (o: any) => o.c,
+        }),
+      ] : []),
     ];
     const props: any = { layers };
     if (resetView) { vsRef.current = computeVS(); props.viewState = vsRef.current; }
