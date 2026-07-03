@@ -112,7 +112,9 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
       const f = Math.min(d.centers.length - 1, Math.round(Math.max(0, Math.min(1, reveal)) * (d.centers.length - 1)));
       return { target: d.centers[f] || d.center, rotationOrbit: -25, rotationX: 14, zoom: Math.log2(240 / (d.radius * 0.3)), minZoom: -6, maxZoom: 26 };
     }
-    return orbitVS.current ?? { target: d.center, rotationOrbit: 30, rotationX: 22, zoom, minZoom: -6, maxZoom: 24 };
+    // rotationOrbit is negated vs three.js's azimuth (deck's orbit convention is the opposite sense): three.js
+    // frames from (0.5,0.45,1) ~ +26.6deg azimuth / +22deg elevation, so deck uses -27 / 22 to look the SAME way.
+    return orbitVS.current ?? { target: d.center, rotationOrbit: -27, rotationX: 22, zoom, minZoom: -6, maxZoom: 24 };
   }
 
   function ensureDeck() {
