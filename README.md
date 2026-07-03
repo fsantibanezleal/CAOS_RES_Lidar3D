@@ -1,5 +1,10 @@
 # CAOS_RES_Lidar3D — streaming 3D reconstruction lab
 
+[![CI](https://img.shields.io/github/actions/workflow/status/fsantibanezleal/CAOS_RES_Lidar3D/ci.yml?branch=main&label=CI)](https://github.com/fsantibanezleal/CAOS_RES_Lidar3D/actions)
+[![License](https://img.shields.io/github/license/fsantibanezleal/CAOS_RES_Lidar3D)](LICENSE)
+[![Version](https://img.shields.io/github/v/tag/fsantibanezleal/CAOS_RES_Lidar3D?label=version&sort=semver)](https://github.com/fsantibanezleal/CAOS_RES_Lidar3D/tags)
+[![Live demo](https://img.shields.io/badge/demo-live-2ea44f)](https://lidar3d.fasl-work.com)
+
 > **Lidar 3D** turns a video stream into a camera trajectory, dense metric depth, and an RGB point cloud,
 > feed-forward and in real time, with **no per-scene optimization**. It is built around **lingbot-map**
 > (arXiv:2604.14141), the 2026 state of the art for *streaming* feed-forward reconstruction (Apache-2.0),
@@ -7,8 +12,10 @@
 
 ![Lidar 3D workbench](docs/assets/workbench.png)
 
-Research repo (ADR-0050 location · ADR-0057 product): local-first, heavy models/data on a scratch volume
-(env-resolved, never in git). **Status v0.02.000** — backbone + frontend built and verified.
+Research repo: local-first, heavy models/data on a scratch volume (env-resolved, never in git).
+**Status: v0.12.001 (live).** Eight real scenes reconstructed by our own depth+pose net (0.28 m held-out
+ATE) with inference-time ICP refinement, replayed in-browser across four renderers; live reconstruction
+runs on a local GPU.
 
 ## Three lanes (ADR-0057)
 
