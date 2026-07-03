@@ -29,6 +29,7 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
   const api = useRef<any>(null);
   const colorRef = useRef(colorMode); colorRef.current = colorMode; // current color for the async load
   const revealRef = useRef(reveal); revealRef.current = reveal;     // current reveal for the async load
+  const darkRef = useRef(dark); darkRef.current = dark;             // current theme for the render loop (see below)
 
   useEffect(() => {
     const mount = mountRef.current!;
@@ -53,7 +54,7 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
       if (document.hidden) return;                       // pause LOD work on a hidden tab
       controls.update();
       if (store.pco) potree.updatePointClouds([store.pco], camera, renderer);
-      renderer.setClearColor(dark ? 0x0b1020 : 0xeef2f8, 1);
+      renderer.setClearColor(darkRef.current ? 0x0b1020 : 0xeef2f8, 1); // ref, not the closure's stale `dark`, so a theme toggle updates the background without a reload
       renderer.render(scene, camera);
     };
     api.current = store;
@@ -80,10 +81,13 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
       pco.material.needsUpdate = true;
       a.scene.add(pco); a.pco = pco;
       a.potree.pointBudget = Math.round(3_000_000 / Math.max(1, density));
-      // fit orbit to the octree bounding box
-      const bb: THREE.Box3 = pco.boundingBox ? pco.boundingBox.clone().applyMatrix4(pco.matrixWorld) : new THREE.Box3().setFromObject(pco);
-      const c = bb.getCenter(new THREE.Vector3());
-      const r = Math.max(bb.getSize(new THREE.Vector3()).length() * 0.5, 0.5);
+      // frame from the ACTUAL cloud (shared OBB), NOT the padded octree bounding box: the octree bbox is larger
+      // than the points, which framed Potree from further/higher than three.js. Use the same centre + 0.55 radius
+      // factor three.js uses, so the orbit view matches.
+      const wp = b64ToF32(trace.points_b64);
+      const obb = cloudObbRender(wp);
+      const c = new THREE.Vector3(obb.center[0], obb.center[1], obb.center[2]);
+      const r = Math.max(Math.hypot(obb.size[0], obb.size[1], obb.size[2]) * 0.55, 0.5);
       a.controls.target.copy(c);
       a.camera.position.copy(c.clone().add(new THREE.Vector3(0.5, 0.45, 1).normalize().multiplyScalar(r * 2.2)));
       a.controls.minDistance = r * 0.02; a.controls.maxDistance = r * 12;
@@ -104,8 +108,7 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
       // frame agrees with worldToRender; if not, the octree bake is off. Toggle: showObb.
       if (a.obbGroup) { a.scene.remove(a.obbGroup); a.obbGroup = null; }
       {
-        const wp = b64ToF32(trace.points_b64);
-        const obb = cloudObbRender(wp); const axz = obbAxes(obb);
+        const axz = obbAxes(obb);   // reuse the obb computed above for the camera framing
         const grp = new THREE.Group();
         const boxPts: THREE.Vector3[] = [];
         for (const [i0, i1] of obb.edges) boxPts.push(new THREE.Vector3(...obb.corners[i0]), new THREE.Vector3(...obb.corners[i1]));

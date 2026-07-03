@@ -3,6 +3,18 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.12.003] · 2026-07-03
+
+### Fixed
+- Potree render background did not react to a light/dark theme toggle: its render loop captured the `dark`
+  prop at mount, so a toggle only took effect after a reload. Read the theme from a ref updated each render,
+  so Potree now matches three.js / surfels / deck.gl on a hot toggle (#43).
+- Orbit camera consistency across renderers (#38 follow-up): deck.gl orbited from a mirrored azimuth (it "looked
+  the other way"); its `rotationOrbit` is negated vs three.js's, so it now uses -27deg / 22deg to view from the
+  same direction as three.js's (0.5,0.45,1). Potree framed the orbit from the padded octree bounding box (larger
+  than the cloud, so it looked "from higher up"); it now frames from the actual cloud OBB with three.js's 0.55
+  radius factor. All four renderers now share the same orbit orientation and framing.
+
 ## [0.12.002] · 2026-07-03
 
 ### Fixed

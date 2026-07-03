@@ -1,2 +1,2 @@
 // App display version (kept in step with data-pipeline/lidar3dlab.__version__ + the git tag).
-export const APP_VERSION = '0.12.002';
+export const APP_VERSION = '0.12.003';
