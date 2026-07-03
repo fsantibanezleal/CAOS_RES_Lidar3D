@@ -3,22 +3,31 @@
 // level-of-detail streaming via potree-core, so it scales to millions of points (only the visible/near nodes at
 // the needed detail are drawn, bounded by a point budget). It needs a render loop for LOD; the loop pauses on a
 // hidden tab (no idle CPU). The octree is baked in the render frame (Y-up), matching three.js/deck.gl.
+//
+// Replay: potree-core has no per-point temporal attribute filter (its only visibility filtering is SPATIAL clip
+// boxes/spheres/planes). So the reveal slider drives a growing set of clip spheres placed along the reconstructed
+// trajectory up to the revealed frame (ClipMode.CLIP_OUTSIDE keeps points inside ANY sphere). This progressively
+// uncovers the map as the camera advances along its path, matching the other renderers' behaviour spatially rather
+// than per-point. At full reveal the clip is disabled so the complete octree is shown. (An exact per-frame octree
+// reveal would require baking a frame attribute into the octree and forking the potree-core shader; tracked as a
+// dedicated task.)
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Potree, PointColorType } from 'potree-core';
+import { Potree, PointColorType, ClipMode, createClipSphere } from 'potree-core';
 import { b64ToF32, type Trace } from '../lib/contract.types';
 import type { CameraMode, ColorMode } from './CloudViewer';
 
 // map our color toggle to a Potree material color source (RGB baked colors vs a height/elevation ramp).
-// (Potree renders the FULL committed octree at LOD; per-frame replay is a three.js/deck.gl feature by design.)
 const HEIGHT_TYPE = (PointColorType as any).ELEVATION ?? (PointColorType as any).HEIGHT ?? PointColorType.RGB;
+const MAX_CLIP_SPHERES = 30;   // potree-core shader compile-time cap (#define max_clip_spheres 30)
 
-export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colorMode }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; cameraMode: CameraMode; colorMode: ColorMode }) {
+export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMode, colorMode }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; cameraMode: CameraMode; colorMode: ColorMode }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const colorRef = useRef(colorMode); colorRef.current = colorMode; // current color for the async load
+  const revealRef = useRef(reveal); revealRef.current = reveal;     // current reveal for the async load
 
   useEffect(() => {
     const mount = mountRef.current!;
@@ -89,6 +98,7 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colo
       }
       a.centers = centers; a.fwds = fwds; a.bbCenter = c; a.bbR = r;
       placeCamera();
+      applyReveal();
     }).catch((e: unknown) => { console.error('potree load', e); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,14 +117,41 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colo
     a.pco.material.needsUpdate = true;
   }, [colorMode]);
 
-  // orbit / top / FIRST-PERSON framing (first-person places the camera on the reconstructed trajectory, matching
-  // three.js/surfels; the octree stays static, but the camera can now stand inside the map and look along the path)
+  // index of the currently-revealed frame along the trajectory (0-based, clamped to the available poses)
+  const revealFrame = (): number => {
+    const a = api.current; const n = a?.centers?.length || 0; if (n <= 1) return 0;
+    return Math.min(n - 1, Math.round(Math.max(0, Math.min(1, revealRef.current)) * (n - 1)));
+  };
+
+  // Reveal the map progressively via clip spheres along the traversed path (potree-core has no per-point temporal
+  // filter, only spatial clipping). Points inside ANY sphere are kept (CLIP_OUTSIDE); as the reveal grows, more of
+  // the path is covered so more of the map appears. At full reveal the clip is disabled to show the complete octree.
+  const applyReveal = () => {
+    const a = api.current; if (!a || !a.pco || !a.centers?.length) return;
+    const mat = a.pco.material; const n: number = a.centers.length; const idx = revealFrame();
+    if (idx >= n - 1) {                                   // full trajectory revealed -> show the whole octree
+      mat.setClipSpheres([]); mat.clipMode = ClipMode.DISABLED; return;
+    }
+    const radius = Math.max(a.bbR * 0.5, 0.3);            // "flashlight" radius around each camera station
+    const count = Math.min(MAX_CLIP_SPHERES, idx + 1);    // subsample the traversed path to <=30 spheres
+    const spheres = [] as any[];
+    for (let k = 0; k < count; k++) {
+      const i = count === 1 ? idx : Math.round((k / (count - 1)) * idx);   // even spread, always includes idx
+      spheres.push(createClipSphere(a.centers[i].clone(), radius));
+    }
+    mat.setClipSpheres(spheres); mat.clipMode = ClipMode.CLIP_OUTSIDE;
+  };
+
+  // orbit / top / FIRST-PERSON framing (first-person places the camera on the reconstructed trajectory at the
+  // revealed frame, matching three.js/surfels; the octree stays static, but the camera stands inside the map and
+  // looks along the path, and follows the reveal slider frame-by-frame)
   const placeCamera = () => {
     const a = api.current; if (!a || !a.pco || !a.bbCenter) return;
     const c: THREE.Vector3 = a.bbCenter, r: number = a.bbR;
     if (cameraMode === 'first' && a.centers?.length) {
-      const pos: THREE.Vector3 = a.centers[a.centers.length - 1];
-      const fwd: THREE.Vector3 = a.fwds[a.fwds.length - 1] || new THREE.Vector3(0, 0, 1);
+      const f = revealFrame();
+      const pos: THREE.Vector3 = a.centers[f];
+      const fwd: THREE.Vector3 = a.fwds[f] || new THREE.Vector3(0, 0, 1);
       a.controls.target.copy(pos.clone().addScaledVector(fwd, Math.max(r * 0.3, 0.3)));   // look ahead along the path
       a.camera.position.copy(pos);
       a.controls.minDistance = 0.01; a.controls.maxDistance = r * 12;
@@ -128,6 +165,14 @@ export function PotreeViewer({ trace, pointSize, dark, density, cameraMode, colo
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(placeCamera, [cameraMode]);
+
+  // reveal slider: grow the clip-sphere set; in first-person also walk the camera to the revealed frame
+  useEffect(() => {
+    const a = api.current; if (!a || !a.pco) return;
+    applyReveal();
+    if (cameraMode === 'first') placeCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 420, background: dark ? '#0b1020' : '#eef2f8' }} />;
 }
