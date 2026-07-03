@@ -167,6 +167,7 @@ def main() -> None:
     ap.add_argument("--init", type=str, default="", help="warm-start: load matching weights from a checkpoint (e.g. reuse a good depth net when training a new pose head)")
     ap.add_argument("--freeze_depth", action="store_true", help="freeze backbone+depth decoder, train ONLY the pose head (stable; isolates a geometric pose on a fixed good depth)")
     ap.add_argument("--smoke", action="store_true", help="1 tiny step on CPU/GPU, no checkpoint")
+    ap.add_argument("--workers", type=int, default=6, help="DataLoader worker processes; >0 parallelises image decode so the GPU is not starved (was hardcoded 0 = serial = GPU idle)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -189,7 +190,10 @@ def main() -> None:
     if args.use_tartan:
         datasets += [TartanGroundPairs(s, image_size=args.size, max_pairs=mp) for s in tartanground_sequences()]
     train = ConcatDataset(datasets)
-    dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, num_workers=0, drop_last=True)
+    nworkers = 0 if args.smoke else max(0, args.workers)
+    dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, drop_last=True,
+                    num_workers=nworkers, pin_memory=(device.type == "cuda"),
+                    persistent_workers=(nworkers > 0), prefetch_factor=(4 if nworkers > 0 else None))
 
     model = OwnDepthPose(base=args.base, max_depth=10.0, backbone=args.backbone,
                          pose_head=args.pose_head).to(device)
