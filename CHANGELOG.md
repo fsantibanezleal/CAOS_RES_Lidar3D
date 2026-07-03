@@ -3,6 +3,19 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.12.002] · 2026-07-03
+
+### Fixed
+- Coordinate system: the OpenCV-world to render-frame transform `(x,-y,-z)` was duplicated inline in every
+  renderer; unified it into `lib/coords.ts` (the single source of truth) consumed by three.js, surfels, Potree
+  and deck.gl. The top view differed (three.js/surfels/Potree drew a 45-degree "diamond" from a diagonal camera
+  offset, deck.gl was axis-aligned); aligned all four to an axis-aligned top so they match.
+
+### Added
+- OBB diagnostic overlay (a **Box (OBB)** toggle): an axis-aligned bounding box of the final cloud plus an RGB
+  axis triad, drawn by every renderer from the shared transform, to compare the coordinate frame across them.
+- `coords.test.ts`: 14 vitest cases for the transform (mapping, handedness, pose, OBB).
+
 ## [0.10.001] · 2026-07-01
 
 ### Fixed
