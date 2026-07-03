@@ -156,12 +156,63 @@ def _refine_global(o3d, clouds: list, model_rels: list, conf_q: float, max_d: fl
     return poses
 
 
+def _refine_window(o3d, clouds: list, model_rels: list, conf_q: float, max_d: float, win: int = 5) -> list:
+    """M-C (inference form): WINDOWED multi-frame bundle adjustment. A pose graph with odometry edges PLUS local
+    temporal-window edges (each frame i connected to its previous `win` frames by ICP), optimized globally. This
+    distributes accumulated drift JOINTLY over overlapping local windows - the multi-frame joint optimization that a
+    single-pair estimator (M-B) cannot do - WITHOUT the spurious spatial long-range loop closures that made the
+    global D1 over-constrain single-area indoor scenes. Falls back to the odometry chain on failure."""
+    reg = o3d.pipelines.registration
+    n = len(clouds)
+    pg = reg.PoseGraph()
+    odo = np.eye(4)                                        # world->cam accumulator (Open3D convention)
+    pg.nodes.append(reg.PoseGraphNode(np.eye(4)))
+    odos = [np.eye(4)]
+    n_win = 0
+    for i in range(1, n):
+        init = np.linalg.inv(model_rels[i - 1])           # odometry: align frame i-1 -> i
+        t, info = init, np.eye(6)
+        if clouds[i] is not None and clouds[i - 1] is not None:
+            try:
+                tt, info_t, fit = _pairwise_icp(o3d, clouds[i - 1], clouds[i], init)
+                if fit > 0.3 and np.isfinite(tt).all() and np.linalg.norm(tt[:3, 3] - init[:3, 3]) < 0.5:
+                    t, info = tt, info_t
+            except Exception:  # noqa: BLE001
+                pass
+        odo = t @ odo
+        odos.append(odo)
+        pg.nodes.append(reg.PoseGraphNode(np.linalg.inv(odo)))
+        pg.edges.append(reg.PoseGraphEdge(i - 1, i, t, info, uncertain=False))
+        # LOCAL window edges: frame i to i-2 .. i-win (temporally local, NOT spatial-global loops)
+        for j in range(max(0, i - win), i - 1):
+            if clouds[i] is None or clouds[j] is None:
+                continue
+            init_ij = odos[i] @ np.linalg.inv(odos[j])     # source j -> target i, per odometry
+            try:
+                tij, infoij, fit = _pairwise_icp(o3d, clouds[j], clouds[i], init_ij)
+                if fit > 0.5 and np.isfinite(tij).all():
+                    pg.edges.append(reg.PoseGraphEdge(j, i, tij, infoij, uncertain=True))
+                    n_win += 1
+            except Exception:  # noqa: BLE001
+                pass
+    if int(os.environ.get("LIDAR3D_VERBOSE", "0")):
+        print(f"  [window] {n} frames, win={win}, {n_win} local-window edges")
+    option = reg.GlobalOptimizationOption(max_correspondence_distance=0.12, edge_prune_threshold=0.25,
+                                          reference_node=0)
+    reg.global_optimization(pg, reg.GlobalOptimizationLevenbergMarquardt(),
+                            reg.GlobalOptimizationConvergenceCriteria(), option)
+    poses = [np.asarray(pg.nodes[i].pose) for i in range(n)]
+    if not all(np.isfinite(p).all() for p in poses):
+        raise RuntimeError("window optimization produced non-finite poses")
+    return poses
+
+
 def _refine_trajectory(depths: list, confs: list, K: np.ndarray, model_rels: list, conf_q: float,
                        max_d: float) -> list:
     """Accumulate camera-to-world poses from the model's per-frame depth + predicted relative pose. Refinement
     ladder (each falls back to the previous on failure):
-      GLOBAL pose-graph optimization + loop closure (D1, default)  ->  frame-to-frame ICP  ->  raw model poses.
-    LIDAR3D_OWN_GLOBAL=0 drops to ICP-only; LIDAR3D_OWN_ICP=0 drops to raw model poses."""
+      WINDOWED multi-frame BA (M-C)  ->  GLOBAL pose-graph + loop closure (D1)  ->  frame-to-frame ICP  ->  raw.
+    Defaults: ICP on; WINDOW/GLOBAL opt-in (LIDAR3D_OWN_WINDOW=1 / LIDAR3D_OWN_GLOBAL=1). LIDAR3D_OWN_ICP=0 -> raw."""
     n = len(depths)
     o3d = None
     if os.environ.get("LIDAR3D_OWN_ICP", "1") != "0":
@@ -175,6 +226,14 @@ def _refine_trajectory(depths: list, confs: list, K: np.ndarray, model_rels: lis
             c2ws.append(c2ws[-1] @ model_rels[i - 1])
         return c2ws
     clouds = [_cam_pcd(o3d, depths[i], confs[i], K, conf_q, max_d) for i in range(n)]
+    # WINDOWED multi-frame BA (M-C): local-window joint optimization, robust on single-area scenes (no global loops).
+    if os.environ.get("LIDAR3D_OWN_WINDOW", "0") != "0":
+        try:
+            return _refine_window(o3d, clouds, model_rels, conf_q, max_d,
+                                  win=int(os.environ.get("LIDAR3D_OWN_WIN", "5")))
+        except Exception as e:  # noqa: BLE001
+            if int(os.environ.get("LIDAR3D_VERBOSE", "0")):
+                print(f"  [window] failed ({e}); falling back")
     # GLOBAL pose-graph optimization (D1) is implemented + available, but OPT-IN: at the current monocular pose
     # accuracy (~0.37 m ATE) its loop closures over-constrain single-area indoor sweeps. It becomes the right default
     # once a stronger model (more training data) gives sub-decimetre poses. Enable with LIDAR3D_OWN_GLOBAL=1.
@@ -258,7 +317,8 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         for i in range(n):
             t0 = torch.from_numpy(rgbs[i].transpose(2, 0, 1))[None].to(device)
             t1 = torch.from_numpy(rgbs[min(i + 1, n - 1)].transpose(2, 0, 1))[None].to(device)
-            out = model(t0, t1)
+            kt = torch.from_numpy(np.ascontiguousarray(K, np.float32))[None].to(device)  # for the geometric pose head
+            out = model(t0, t1, k=kt)
             depths.append(out["depth0"][0, 0].float().cpu().numpy())
             confs.append(np.exp(-out["logvar0"][0, 0].float().cpu().numpy()))  # aleatoric confidence (high=reliable)
             model_rels.append(out["rel_pose"][0].float().cpu().numpy())        # maps frame i+1 -> frame i
