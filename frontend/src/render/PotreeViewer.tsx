@@ -16,14 +16,15 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Potree, PointColorType, ClipMode, createClipSphere } from 'potree-core';
 import { b64ToF32, type Trace } from '../lib/contract.types';
+import { poseCenter, poseForward, cloudObbRender, obbAxes } from '../lib/coords';
 import type { CameraMode, ColorMode } from './CloudViewer';
 
 // map our color toggle to a Potree material color source (RGB baked colors vs a height/elevation ramp).
 const HEIGHT_TYPE = (PointColorType as any).ELEVATION ?? (PointColorType as any).HEIGHT ?? PointColorType.RGB;
 const MAX_CLIP_SPHERES = 30;   // potree-core shader compile-time cap (#define max_clip_spheres 30)
 
-export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMode, colorMode }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; cameraMode: CameraMode; colorMode: ColorMode }) {
+export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMode, colorMode, showObb = false }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; cameraMode: CameraMode; colorMode: ColorMode; showObb?: boolean }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const colorRef = useRef(colorMode); colorRef.current = colorMode; // current color for the async load
@@ -92,11 +93,29 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
       const poses = b64ToF32(trace.poses_b64); const S = (poses.length / 12) | 0;
       const centers: THREE.Vector3[] = [], fwds: THREE.Vector3[] = [];
       for (let i = 0; i < S; i++) {
-        const p = poses.subarray(i * 12, i * 12 + 12);
-        centers.push(new THREE.Vector3(p[3], -p[7], -p[11]));
-        fwds.push(new THREE.Vector3(p[2], -p[6], -p[10]).normalize());
+        const cc = poseCenter(poses, i * 12), fw = poseForward(poses, i * 12);  // shared transform (lib/coords)
+        centers.push(new THREE.Vector3(cc[0], cc[1], cc[2]));
+        fwds.push(new THREE.Vector3(fw[0], fw[1], fw[2]));
       }
       a.centers = centers; a.fwds = fwds; a.bbCenter = c; a.bbR = r;
+
+      // OBB diagnostic (shared coords): computed from the raw world points, drawn in the Potree three.js scene,
+      // so it is directly comparable to the box the other renderers draw. If it hugs the octree, Potree's baked
+      // frame agrees with worldToRender; if not, the octree bake is off. Toggle: showObb.
+      if (a.obbGroup) { a.scene.remove(a.obbGroup); a.obbGroup = null; }
+      {
+        const wp = b64ToF32(trace.points_b64);
+        const obb = cloudObbRender(wp); const axz = obbAxes(obb);
+        const grp = new THREE.Group();
+        const boxPts: THREE.Vector3[] = [];
+        for (const [i0, i1] of obb.edges) boxPts.push(new THREE.Vector3(...obb.corners[i0]), new THREE.Vector3(...obb.corners[i1]));
+        grp.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(boxPts), new THREE.LineBasicMaterial({ color: 0x8899bb })));
+        const axPts = [new THREE.Vector3(...axz.origin), new THREE.Vector3(...axz.x), new THREE.Vector3(...axz.origin), new THREE.Vector3(...axz.y), new THREE.Vector3(...axz.origin), new THREE.Vector3(...axz.z)];
+        const axCol = new Float32Array([1, 0.2, 0.2, 1, 0.2, 0.2, 0.2, 1, 0.2, 0.2, 1, 0.2, 0.3, 0.55, 1, 0.3, 0.55, 1]);
+        const axGeo = new THREE.BufferGeometry().setFromPoints(axPts); axGeo.setAttribute('color', new THREE.BufferAttribute(axCol, 3));
+        grp.add(new THREE.LineSegments(axGeo, new THREE.LineBasicMaterial({ vertexColors: true })));
+        grp.visible = showObb; a.scene.add(grp); a.obbGroup = grp;
+      }
       placeCamera();
       applyReveal();
     }).catch((e: unknown) => { console.error('potree load', e); });
@@ -157,7 +176,8 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
       a.controls.minDistance = 0.01; a.controls.maxDistance = r * 12;
     } else {
       a.controls.target.copy(c);
-      const dir = cameraMode === 'top' ? new THREE.Vector3(0.001, 1, 0.001) : new THREE.Vector3(0.5, 0.45, 1);
+      // top: straight down +Y with a tiny +Z tilt (axis-aligned, X-right/Z-vertical), matching deck.gl + three.js
+      const dir = cameraMode === 'top' ? new THREE.Vector3(0, 1, 0.012) : new THREE.Vector3(0.5, 0.45, 1);
       a.camera.position.copy(c.clone().add(dir.normalize().multiplyScalar(r * 2.2)));
       a.controls.minDistance = r * 0.02; a.controls.maxDistance = r * 12;
     }
@@ -173,6 +193,9 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
     if (cameraMode === 'first') placeCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal]);
+
+  // OBB overlay toggle (the render loop paints the change on the next frame)
+  useEffect(() => { const a = api.current; if (a?.obbGroup) a.obbGroup.visible = showObb; }, [showObb]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 420, background: dark ? '#0b1020' : '#eef2f8' }} />;
 }

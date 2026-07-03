@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { b64ToF32, b64ToU8, type Trace } from '../lib/contract.types';
+import { worldToRenderBuffer, poseCenter, poseForward, poseApplyToRender, cloudObbRender, obbAxes } from '../lib/coords';
 
 export type ColorMode = 'rgb' | 'depth';
 export type CameraMode = 'orbit' | 'first' | 'top';
@@ -29,8 +30,8 @@ function ramp(t: number): [number, number, number] {
   return [Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)];
 }
 
-export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true, surfel = false }:
-  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean; surfel?: boolean }) {
+export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode, cameraMode, showCones = true, showTraj = true, surfel = false, showObb = false }:
+  { trace: Trace; pointSize: number; dark: boolean; density: number; reveal: number; colorMode: ColorMode; cameraMode: CameraMode; showCones?: boolean; showTraj?: boolean; surfel?: boolean; showObb?: boolean }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const api = useRef<any>(null);
   const data = useRef<{ pts: Float32Array; offsets: number[]; nFrames: number } | null>(null);
@@ -99,11 +100,10 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const nAll = (pAll.length / 3) | 0;
     const stride = Math.max(1, Math.round(density));
     const n = Math.ceil(nAll / stride);
-    const pts = new Float32Array(n * 3), cols = new Uint8Array(n * 3);
-    // OpenCV world (X-right, Y-down, Z-forward) -> render frame (Y-up): (x,y,z)->(x,-y,-z). Handedness-preserving
-    // (a 180 deg rotation about X, det=+1), so NO mirror. The SAME transform is applied in DeckViewer.
+    // world -> render frame via the shared transform (lib/coords), so all four renderers agree by construction.
+    const pts = worldToRenderBuffer(pAll, stride);
+    const cols = new Uint8Array(n * 3);
     for (let i = 0, j = 0; i < nAll; i += stride, j++) {
-      pts[j * 3] = pAll[i * 3]; pts[j * 3 + 1] = -pAll[i * 3 + 1]; pts[j * 3 + 2] = -pAll[i * 3 + 2];
       cols[j * 3] = cAll[i * 3]; cols[j * 3 + 1] = cAll[i * 3 + 1]; cols[j * 3 + 2] = cAll[i * 3 + 2];
     }
     if (colorMode === 'depth') {
@@ -127,20 +127,38 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const diag = g.boundingBox ? g.boundingBox.getSize(new THREE.Vector3()).length() : 1;
     const s = Math.max(diag * 0.018, 0.03), d = s * 2.0;
     const fp = [[0,0,0],[s,s,d],[0,0,0],[s,-s,d],[0,0,0],[-s,s,d],[0,0,0],[-s,-s,d],[s,s,d],[s,-s,d],[s,-s,d],[-s,-s,d],[-s,-s,d],[-s,s,d],[-s,s,d],[s,s,d]];
-    const FLIP = new THREE.Matrix4().makeScale(1, -1, -1); // OpenCV world -> render frame, applied AFTER the pose
     a.frustums = []; const centers: THREE.Vector3[] = []; const fwds: THREE.Vector3[] = [];
     for (let i = 0; i < S; i++) {
       const p = poses.subarray(i * 12, i * 12 + 12);
-      const m = new THREE.Matrix4().set(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], 0, 0, 0, 1);
-      centers.push(new THREE.Vector3(p[3], -p[7], -p[11]));                     // center in render frame
-      fwds.push(new THREE.Vector3(p[2], -p[6], -p[10]).normalize());            // forward in render frame
-      const fg = new THREE.BufferGeometry().setFromPoints(fp.map((q) => new THREE.Vector3(q[0], q[1], q[2])));
-      fg.applyMatrix4(m); fg.applyMatrix4(FLIP);                                // pose then OpenCV->render flip
+      const c = poseCenter(p), fw = poseForward(p);                            // shared transform (lib/coords)
+      centers.push(new THREE.Vector3(c[0], c[1], c[2]));
+      fwds.push(new THREE.Vector3(fw[0], fw[1], fw[2]));
+      const fg = new THREE.BufferGeometry().setFromPoints(fp.map((q) => {
+        const r = poseApplyToRender(p, 0, q[0], q[1], q[2]);                   // pose then world->render, one path
+        return new THREE.Vector3(r[0], r[1], r[2]);
+      }));
       const ls = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ color: 0x33d6a6 })); ls.frustumCulled = false; a.traj.add(ls); a.frustums.push(ls);
     }
     const tg = new THREE.BufferGeometry().setFromPoints(centers);
     a.trajLine = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xff5252 })); a.trajLine.frustumCulled = false; a.traj.add(a.trajLine);
     a.centers = centers; a.fwds = fwds; a.bbox = g.boundingBox;
+
+    // OBB diagnostic (shared coords): a box hugging the final cloud + an RGB axis triad at its min corner,
+    // so the render frame is unambiguous and directly comparable across the four renderers. Toggle: showObb.
+    if (a.obbGroup) { a.scene.remove(a.obbGroup); a.obbGroup = null; }
+    {
+      const obb = cloudObbRender(pAll, stride); const ax = obbAxes(obb);
+      const grp = new THREE.Group();
+      const boxPts: THREE.Vector3[] = [];
+      for (const [i0, i1] of obb.edges) boxPts.push(new THREE.Vector3(...obb.corners[i0]), new THREE.Vector3(...obb.corners[i1]));
+      const box = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(boxPts), new THREE.LineBasicMaterial({ color: 0x8899bb }));
+      box.frustumCulled = false; grp.add(box);
+      const axPts = [new THREE.Vector3(...ax.origin), new THREE.Vector3(...ax.x), new THREE.Vector3(...ax.origin), new THREE.Vector3(...ax.y), new THREE.Vector3(...ax.origin), new THREE.Vector3(...ax.z)];
+      const axCol = new Float32Array([1, 0.2, 0.2, 1, 0.2, 0.2, 0.2, 1, 0.2, 0.2, 1, 0.2, 0.3, 0.55, 1, 0.3, 0.55, 1]); // +X red, +Y green, +Z blue
+      const axGeo = new THREE.BufferGeometry().setFromPoints(axPts); axGeo.setAttribute('color', new THREE.BufferAttribute(axCol, 3));
+      const axis = new THREE.LineSegments(axGeo, new THREE.LineBasicMaterial({ vertexColors: true })); axis.frustumCulled = false; grp.add(axis);
+      grp.visible = showObb; a.scene.add(grp); a.obbGroup = grp;
+    }
 
     const isNewCase = caseRef.current !== trace.case_id; // preserve the user's view on density/color changes
     caseRef.current = trace.case_id;
@@ -163,7 +181,9 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
       a.controls.minDistance = 0.01; a.controls.maxDistance = r * 6;
     } else if (cameraMode === 'top') {
       a.controls.target.copy(c);
-      a.camera.position.copy(c.clone().add(new THREE.Vector3(0.001, r * 2.4, 0.001))); // above (+Y up)
+      // straight down the +Y axis with a tiny +Z tilt (not a diagonal one): keeps the view AXIS-ALIGNED
+      // (X-right, Z-vertical) instead of a 45-degree "diamond", so it matches deck.gl's top exactly.
+      a.camera.position.copy(c.clone().add(new THREE.Vector3(0, r * 2.4, r * 0.012)));
       a.controls.minDistance = r * 0.2; a.controls.maxDistance = r * 8;
     } else { // orbit
       a.controls.minDistance = r * 0.05; a.controls.maxDistance = r * 10;
@@ -198,6 +218,7 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     a.render();
   }
   useEffect(applyReveal, [reveal, showCones, showTraj]);
+  useEffect(() => { const a = api.current; if (a?.obbGroup) { a.obbGroup.visible = showObb; a.render(); } }, [showObb]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 420 }} />;
 }

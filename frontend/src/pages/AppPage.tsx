@@ -30,6 +30,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
   const [showCones, setShowCones] = useState(true);
   const [showTraj, setShowTraj] = useState(true);
+  const [showObb, setShowObb] = useState(false); // OBB + RGB axes overlay to compare the coordinate frame across renderers
   const raf = useRef(0);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         <div className="chips">
           <button className={'chip' + (showCones ? ' on' : '')} onClick={() => setShowCones(!showCones)}>{es(lang) ? 'Conos' : 'Cones'}</button>
           <button className={'chip' + (showTraj ? ' on' : '')} onClick={() => setShowTraj(!showTraj)}>{es(lang) ? 'Trayectoria' : 'Trajectory'}</button>
+          <button className={'chip' + (showObb ? ' on' : '')} onClick={() => setShowObb(!showObb)} title={es(lang) ? 'Caja + ejes RGB para comparar el sistema de coordenadas entre renderers' : 'Bounding box + RGB axes to compare the coordinate frame across renderers'}>{es(lang) ? 'Caja (OBB)' : 'Box (OBB)'}</button>
         </div>
 
         <label className="lab">{es(lang) ? 'Motor de render' : 'Renderer'}</label>
@@ -133,10 +135,10 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
       <section className="stage">
         {trace && (renderer === 'deck'
-          ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} />
+          ? <DeckViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} showObb={showObb} />
           : renderer === 'potree'
-            ? <PotreeViewer key={trace.case_id} trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} cameraMode={camMode} colorMode={colorMode} />
-            : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} />)}
+            ? <PotreeViewer key={trace.case_id} trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} cameraMode={camMode} colorMode={colorMode} showObb={showObb} />
+            : <CloudViewer trace={trace} pointSize={ptSize} dark={dark} density={DETAIL_STRIDE[detail - 1]} reveal={reveal} colorMode={colorMode} cameraMode={camMode} showCones={showCones} showTraj={showTraj} surfel={renderer === 'surfels'} showObb={showObb} />)}
         <div className="overlay">
           {trace ? `${trace.n_points.toLocaleString()} pts · ${trace.n_frames} frames · ${trace.path_length} m · ${shownPct}%` : 'loading…'}
         </div>
