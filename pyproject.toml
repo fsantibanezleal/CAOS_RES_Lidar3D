@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lidar3dlab"
 # PEP 440 form of the display version X.XX.XXX (see CHANGELOG.md + lidar3dlab.__version__).
-version = "0.1.0"
+version = "0.12.3"
 description = "CAOS product-repo template — offline data-pipeline + two data contracts + staged pipeline (EXAMPLE: SIR)."
 readme = "README.md"
 requires-python = ">=3.11"
