@@ -37,10 +37,11 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
     const n = Math.ceil(nAll / stride);
     const pos = new Float32Array(n * 3), col = new Uint8Array(n * 3), fil = new Float32Array(n);
     let lo = Infinity, hi = -Infinity, minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
-    // NEGATE Y: the cloud is Y-down (OpenCV); deck.gl OrbitView treats +Y as up, so without this the scene
-    // renders vertically flipped vs three.js (which sets camera.up = -Y). Flip once, here, consistently.
+    // OpenCV world (X-right, Y-down, Z-forward) -> render frame (x,-y,-z), the SAME transform three.js / surfels /
+    // Potree use, so all four renderers agree exactly (deck.gl was previously (x,-y,z) = a mirror, rendering the
+    // scene in a different orientation than the others).
     for (let i = 0, j = 0; i < nAll; i += stride, j++) {
-      const x = pAll[i * 3], y = -pAll[i * 3 + 1], z = pAll[i * 3 + 2];
+      const x = pAll[i * 3], y = -pAll[i * 3 + 1], z = -pAll[i * 3 + 2];
       pos[j * 3] = x; pos[j * 3 + 1] = y; pos[j * 3 + 2] = z;
       col[j * 3] = cAll[i * 3]; col[j * 3 + 1] = cAll[i * 3 + 1]; col[j * 3 + 2] = cAll[i * 3 + 2]; fil[j] = j;
       if (y < lo) lo = y; if (y > hi) hi = y;
@@ -60,10 +61,10 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
     const corners: V3[] = [[sz, sz, dd], [sz, -sz, dd], [-sz, -sz, dd], [-sz, sz, dd]];
     for (let i = 0; i < S; i++) {
       const o = i * 12;
-      const c: V3 = [poses[o + 3], -poses[o + 7], poses[o + 11]];   // Y negated to match the cloud
+      const c: V3 = [poses[o + 3], -poses[o + 7], -poses[o + 11]];  // (x,-y,-z) to match the cloud + the other renderers
       centers.push(c);
-      fwds.push([poses[o + 2], -poses[o + 6], poses[o + 10]]);
-      const cw = corners.map((q) => { const p = apply(poses, o, q[0], q[1], q[2]); return [p[0], -p[1], p[2]] as V3; });
+      fwds.push([poses[o + 2], -poses[o + 6], -poses[o + 10]]);
+      const cw = corners.map((q) => { const p = apply(poses, o, q[0], q[1], q[2]); return [p[0], -p[1], -p[2]] as V3; });
       for (let k = 0; k < 4; k++) { frus.push({ s: c, t: cw[k], f: i }); frus.push({ s: cw[k], t: cw[(k + 1) % 4], f: i }); }
       if (i > 0) traj.push({ s: centers[i - 1], t: c, f: i });
     }
