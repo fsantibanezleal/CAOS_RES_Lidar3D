@@ -76,10 +76,10 @@ third_party/lingbot-map/    the vendored engine (Apache-2.0)
 
 Beyond using SOTA, the lab pursues lingbot-map's three stated gaps: **loop closure** (pose-graph over the
 trajectory memory), **camera↔LiDAR fusion**, and **test-time refinement** (textured mesh / 3DGS). Each is
-evaluated rigorously, null results kept. See `_CAOS_MANAGE/wip/lidar3d/` for the research dossier.
+evaluated rigorously, null results kept. See `docs/research/` for the published surveys and findings.
 
 ## Credits / license
 
-Built around **lingbot-map** (arXiv:2604.14141, Apache-2.0), vendored under `third_party/`. This repo is
-private research; engine/weight licenses tracked per-engine (some are non-commercial, flagged before any
-product use).
+Built around **lingbot-map** (arXiv:2604.14141, Apache-2.0), vendored under `third_party/`. This repository
+is licensed under **Apache-2.0** (see `LICENSE`). The vendored engine and any model weights keep their own
+licenses, tracked per-engine (some are non-commercial, flagged before any product use).
