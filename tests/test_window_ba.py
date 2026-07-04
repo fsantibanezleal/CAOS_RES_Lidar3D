@@ -1,9 +1,16 @@
 """M-C windowed pose-graph optimiser (#22): it must reduce trajectory drift vs chaining single-pair estimates
-AND be differentiable (so the geometric head can be trained THROUGH it)."""
-import torch
+AND be differentiable (so the geometric head can be trained THROUGH it).
 
-from lidar3dlab.model.nets.own_depthpose import se3_exp
-from lidar3dlab.model.nets.window_ba import window_pgo
+torch is the local-GPU dependency and is NOT in the CI offline lane, so skip this module there (it still runs
+in the local .venv where the model + training live)."""
+import pytest
+
+pytest.importorskip("torch")
+
+import torch  # noqa: E402
+
+from lidar3dlab.model.nets.own_depthpose import se3_exp  # noqa: E402
+from lidar3dlab.model.nets.window_ba import window_pgo  # noqa: E402
 
 
 def _window(n, gt_scale=0.15, noise=0.03, seed=0):
