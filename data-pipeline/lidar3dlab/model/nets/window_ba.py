@@ -24,8 +24,16 @@ Conventions
 from __future__ import annotations
 
 import torch
+from torch import nn
 
-from .own_depthpose import se3_exp
+from .own_depthpose import (
+    DepthDecoder,
+    DinoDepthDecoder,
+    DinoV2Encoder,
+    GeoPoseHead,
+    PretrainedEncoder,
+    se3_exp,
+)
 
 _EYE34 = None
 
@@ -56,35 +64,87 @@ def _edge_residual(xi_free: torch.Tensor, n: int, ei: torch.Tensor, ej: torch.Te
 
 
 def window_pgo(z_rel: torch.Tensor, edges: torch.Tensor, weight: torch.Tensor,
-               n: int, iters: int = 5, damping: float = 1e-3) -> torch.Tensor:
-    """Differentiable windowed pose-graph optimisation.
+               n: int, iters: int = 4, damping: float = 1e-1, max_step: float = 0.5) -> torch.Tensor:
+    """Differentiable windowed pose-graph optimisation (Levenberg-Marquardt style).
 
     z_rel:  [E,4,4] measured relative poses T_i^{-1} T_j for each edge.
     edges:  [E,2] long, the (i,j) frame indices per edge.
     weight: [E]    per-edge confidence (>=0).
     Returns absolute poses [n,4,4] (pose 0 = identity), differentiable w.r.t. z_rel + weight.
+
+    Stability: strong LM damping keeps J^T W J + lambda I well-conditioned even when the measurements are
+    degenerate (untrained head), the per-iteration step is norm-clamped, and NaN/Inf are scrubbed, so the
+    differentiable second-order backward stays finite through training.
     """
     device, dtype = z_rel.device, torch.float32
-    z_rel = z_rel.to(dtype)
+    z_rel = torch.nan_to_num(z_rel.to(dtype))
     ei, ej = edges[:, 0], edges[:, 1]
-    z_inv = torch.linalg.inv(z_rel)
-    w = weight.to(dtype).clamp(min=0)
+    z_inv = torch.nan_to_num(torch.linalg.inv(z_rel))
+    w = torch.nan_to_num(weight.to(dtype)).clamp(min=0)
     w12 = w.repeat_interleave(12)                            # residual weight per 12-block
-    xi = torch.zeros((n - 1) * 6, device=device, dtype=dtype, requires_grad=False)
+    p = (n - 1) * 6
+    eye = torch.eye(p, device=device, dtype=dtype)
+    xi = torch.zeros(p, device=device, dtype=dtype)
 
     for _ in range(iters):
         def res_fn(x):
             return _edge_residual(x, n, ei, ej, z_inv)
         r = res_fn(xi)                                       # [E*12]
-        # Jacobian via autograd (small: [E*12, (n-1)*6]); create_graph keeps the solve differentiable.
-        j = torch.autograd.functional.jacobian(res_fn, xi, create_graph=True, vectorize=True)  # [E*12,(n-1)*6]
+        j = torch.autograd.functional.jacobian(res_fn, xi, create_graph=True, vectorize=True)  # [E*12,P]
         jw = j * w12[:, None]
-        h = jw.transpose(0, 1) @ j                           # [P,P] approx Hessian (J^T W J)
-        g = jw.transpose(0, 1) @ r                           # [P] gradient (J^T W r)
-        h = h + damping * torch.eye(h.shape[0], device=device, dtype=dtype)
-        dx = torch.linalg.solve(h, -g)                       # GN step
-        xi = xi + dx
+        h = jw.transpose(0, 1) @ j + damping * eye           # LM-damped approx Hessian (J^T W J + lambda I)
+        g = jw.transpose(0, 1) @ r                           # J^T W r
+        dx = torch.linalg.solve(h, -g)                       # damped GN step
+        dx = torch.nan_to_num(dx)
+        scale = (max_step / dx.norm().clamp(min=max_step))   # cap the step length for stability
+        xi = xi + dx * scale
     return _poses_from_xi(xi, n)
+
+
+class WindowDepthPose(nn.Module):
+    """M-C model: per-frame depth + a WINDOW of jointly-optimised poses. Reuses OwnDepthPose's depth+geo machinery
+    (pretrained/frozen backbone -> depth decoder -> metric-depth-seeded geometric measurements) but, instead of one
+    relative pose per pair, emits a measurement per window EDGE (consecutive + skip) and solves ALL the window's
+    absolute poses jointly with the differentiable window_pgo. The geo head is trained THROUGH the optimiser, so it
+    learns measurements that are globally consistent, not just locally good (the fix for per-pair accumulation)."""
+
+    def __init__(self, backbone: str = "resnet18", base: int = 64, max_depth: float = 10.0,
+                 pretrained: bool = True, iters: int = 5):
+        super().__init__()
+        self.backbone = backbone
+        self.iters = iters
+        if backbone.startswith("dinov2"):
+            self.enc = DinoV2Encoder(name=backbone)
+            self.dec = DinoDepthDecoder(self.enc.embed_dim, n_levels=len(self.enc.layers),
+                                        base=max(base, 64), max_depth=max_depth)
+            self._plevel = -1
+            grid_feat = self.enc.embed_dim
+        else:  # resnet18
+            self.enc = PretrainedEncoder(pretrained=pretrained)
+            self.dec = DepthDecoder(self.enc.out_ch, base, max_depth)
+            self._plevel = 3
+            grid_feat = self.enc.out_ch[3]
+        self.geo = GeoPoseHead(feat=grid_feat)
+
+    def forward(self, rgbs: torch.Tensor, k: torch.Tensor, edges: torch.Tensor) -> dict:
+        """rgbs: [N,3,H,W] (one window). k: [3,3]. edges: [E,2] long (i,j frame indices).
+        Returns poses [N,4,4] (frame 0 = identity anchor), depth [N,1,H,W], logvar, and the raw measurements."""
+        n = rgbs.shape[0]
+        feats = self.enc(rgbs)                              # list of levels, each [N,C,h,w]
+        depth, logvar = self.dec(feats, rgbs.shape[-2:])    # [N,1,H,W]
+        gf = feats[self._plevel]                            # [N,C,h,w] grid features for correspondences
+        ei, ej = edges[:, 0], edges[:, 1]
+        ke = k.reshape(1, 3, 3).expand(edges.shape[0], 3, 3).contiguous()
+        z_rel, w = self.geo.measure(gf[ei], gf[ej], depth[ei], depth[ej], ke)  # [E,4,4] (T_i^-1 T_j), [E]
+        poses = window_pgo(z_rel, edges, w, n, iters=self.iters)               # [N,4,4] jointly optimised
+        return {"poses": poses, "depth": depth, "logvar": logvar, "z_rel": z_rel, "weight": w}
+
+
+def window_edges(n: int, skip: int = 2) -> torch.Tensor:
+    """The window's edge set: all consecutive pairs plus skip connections up to `skip` apart. The skip edges are
+    the extra constraints that let the joint solve beat a pure consecutive chain."""
+    e = [(i, j) for j in range(1, skip + 1) for i in range(n - j)]
+    return torch.tensor(e, dtype=torch.long)
 
 
 # ---- synthetic self-test: does the windowed PGO beat chained single-pair on a noisy window? ---------------
