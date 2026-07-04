@@ -13,9 +13,9 @@
 ![Lidar 3D workbench](docs/assets/workbench.png)
 
 Research repo: local-first, heavy models/data on a scratch volume (env-resolved, never in git).
-**Status: v0.12.001 (live).** Eight real scenes reconstructed by our own depth+pose net (0.28 m held-out
-ATE) with inference-time ICP refinement, replayed in-browser across four renderers; live reconstruction
-runs on a local GPU.
+**Status: v0.12.001 (live).** Eight real scenes reconstructed by Estela, our own depth+pose net (0.28 m
+held-out ATE) with inference-time ICP refinement, replayed in-browser across four renderers; live
+reconstruction runs on a local GPU.
 
 ## Three lanes (ADR-0057)
 
