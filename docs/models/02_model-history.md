@@ -84,6 +84,18 @@ effort goes to a stronger learned front-end (better pose/depth/matching) or the 
 (2) the shipped ICP-for-bake improves LOCAL cloud consistency but worsens GLOBAL ATE, a real tradeoff, so flipping
 the bake default to raw is a cloud-quality-vs-ATE judgment that needs a visual check, not an automatic flip.
 
+**Pointmap-paradigm probe (2026-07-04): the vendored lingbot does NOT beat Estela.** To test whether a pointmap
+model (which predicts geometry + pose jointly and sidesteps the per-pair ceiling) wins on our indoor scenes, we ran
+the vendored `lingbot` engine (VGGT-style GCTStream, ~7 GB, 4.6 GB checkpoint) on `long_office` and measured its
+ATE directly (it predicts poses). On the matched first 150 frames: **lingbot 0.350 m vs Estela raw 0.124 m**, so
+Estela is about 3x better on trajectory. Its cloud is denser (597 k points vs Estela ~85 k) but diffuse and
+scale-compressed (bbox ~1.5 m for a ~5 m room), not obviously cleaner. So the one VGGT-class model we have loses
+on both ATE and cloud coherence. The literature's stronger pointmap-SLAM (MASt3R-SLAM, ~0.04-0.06 m indoor) is
+research-only license and would need the offline lane; the general lingbot is not fine-tuned on TUM, while Estela
+is. Honest conclusion from these two probes: the 0.28 m ceiling is robust, neither geometric post-processing nor
+the available pointmap model beats it, so breaking it needs a stronger LEARNED front-end (better depth + matcher,
+re-trained pose), not a cheap swap.
+
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
 checkpoint with a killed-early run's worse checkpoint (0.77 m). The *deployed* artifacts (v0.11.000) are safe (baked +
