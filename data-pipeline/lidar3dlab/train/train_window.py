@@ -72,6 +72,7 @@ def evaluate(model: WindowDepthPose, ds, device: torch.device, window: int, skip
     gt_c2w = np.eye(4)
     gt_list = [gt_c2w[:3, 3].copy()]
     edge_err_sum, edge_err_n = 0.0, 0
+    drift_f_sum, drift_c_sum = 0.0, 0.0      # per-window drift: isolates fusion gain from long-traj accumulation
     for wi in range(len(ds)):
         s = ds[wi]
         rgbs = torch.from_numpy(s["rgbs"]).to(device)
@@ -90,6 +91,10 @@ def evaluate(model: WindowDepthPose, ds, device: torch.device, window: int, skip
             chain.append(chain[-1] @ z_by_pair[(f - 1, f)])
         chain = np.stack(chain)
         gt_np = gt_poses.cpu().numpy()
+        # per-window drift (scale-normalised to a single window, anchored at frame 0): the clean fusion-vs-chain
+        # signal, independent of how far the full trajectory accumulates
+        drift_f_sum += float(np.linalg.norm(fused[:, :3, 3] - gt_np[:, :3, 3], axis=1).mean())
+        drift_c_sum += float(np.linalg.norm(chain[:, :3, 3] - gt_np[:, :3, 3], axis=1).mean())
         for f in range(1, window):                       # append frames 1..N-1 (frame 0 is the shared anchor)
             pred_f.append((Gf @ fused[f])[:3, 3].copy())
             pred_c.append((Gc @ chain[f])[:3, 3].copy())
@@ -100,7 +105,9 @@ def evaluate(model: WindowDepthPose, ds, device: torch.device, window: int, skip
     pf, pc, g = np.asarray(pred_f), np.asarray(pred_c), np.asarray(gt_list)
     n = min(len(pf), len(g))
     return {"ate_fused": umeyama_ate(pf[:n], g[:n]), "ate_chain": umeyama_ate(pc[:n], g[:n]),
-            "edge_err": edge_err_sum / max(1, edge_err_n), "windows": len(ds)}
+            "edge_err": edge_err_sum / max(1, edge_err_n),
+            "drift_fused": drift_f_sum / max(1, edge_err_n), "drift_chain": drift_c_sum / max(1, edge_err_n),
+            "windows": len(ds)}
 
 
 def main() -> None:
@@ -221,7 +228,8 @@ def main() -> None:
         results = [(name, evaluate(model, ds, device, args.window, args.skip)) for name, ds in val_sets]
         primary = results[0][1]                          # first val set (TUM long_office if --eval_tum) selects best
         improved = primary["ate_fused"] < best
-        line = "  ".join(f"{nm}[fused={r['ate_fused']:.4f} chain={r['ate_chain']:.4f} edge={r['edge_err']:.4f}]"
+        line = "  ".join(f"{nm}[ATE fused={r['ate_fused']:.3f} chain={r['ate_chain']:.3f} | "
+                         f"drift fused={r['drift_fused']:.4f} chain={r['drift_chain']:.4f} | edge={r['edge_err']:.4f}]"
                          for nm, r in results)
         print(f"[epoch {ep}] {line}" + (" (best, saved)" if improved else ""))
         with open(out_dir / "experiments.jsonl", "a", encoding="utf-8") as f:
@@ -229,6 +237,7 @@ def main() -> None:
                 f.write(json.dumps({"ts": _dt.datetime.now().isoformat(timespec="seconds"), "model": "window-mc",
                                     "backbone": args.backbone, "epoch": ep, "window": args.window, "skip": args.skip,
                                     "ate_fused": round(r["ate_fused"], 4), "ate_chain": round(r["ate_chain"], 4),
+                                    "drift_fused": round(r["drift_fused"], 4), "drift_chain": round(r["drift_chain"], 4),
                                     "edge_err": round(r["edge_err"], 4), "is_best": (improved and nm == results[0][0]),
                                     "val_seq": nm}) + "\n")
         if improved:
