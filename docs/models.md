@@ -11,6 +11,7 @@ into it and the history of training them, so no experiment or negative result is
 | 02 | [Model history](models/02_model-history.md) | the complete chronological record of every model/experiment: backbone, data, held-out ATE, points, what was deployed, and every negative result, so the history is preserved |
 | 03 | [Experiments log](models/03_experiments-log.md) | the machine-readable `experiments.jsonl` schema (one row per training epoch, never truncated), how to read it, and how the web Experiments page renders it |
 | 04 | [Datasets](models/04_datasets.md) | the model data: training datasets (TUM x11, ICL-NUIM, 7-Scenes), formats, the real per-dataset intrinsics, licenses, and the bigger-data roadmap |
+| 05 | [Windowed pose-graph (M-C)](models/05_windowed-pose-graph.md) | the multi-frame extension: a relative-pose measurement per window edge (consecutive + skip) fused by a differentiable pose-graph solve, the training-path pivot (supervise the measurements directly, solve forward-only at inference), and the fused-vs-chain evaluation |
 
 ## Where the models live
 
