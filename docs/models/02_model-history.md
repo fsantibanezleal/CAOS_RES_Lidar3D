@@ -72,6 +72,18 @@ held-out TUM `long_office`:
   Siamese / ICP-refined edges. `window-mc.pt` is kept separate (own-depthpose.pt = M8 stays LIVE). Full write-up:
   [Estela-W](05_windowed-pose-graph.md).
 
+**Refinement-mode ATE benchmark (2026-07-04, `train/eval_refine_modes.py`).** A direct, honest test of the
+inference refinement ladder on the held-out `long_office`: run M8's per-frame depth + relative pose once, then
+re-run `_refine_trajectory` under each mode and measure umeyama ATE. The **raw model pose chain reproduces exactly
+0.28 m** (0.2815 m), which validates the benchmark, and it is the **BEST** mode: on consecutive frames ICP 0.65 m,
+windowed BA 0.63 m, global PGO 0.73 m; at the bake's stride-2 raw 0.91 m, ICP 1.21 m, window 1.10 m, global
+1.15 m. So every geometric refinement, initialised by the already-good learned poses, DRIFTS on the noisy monocular
+depth and WORSENS the trajectory. The windowed BA consistently beats plain ICP (by 9 to 31 %) but never beats raw.
+Two conclusions: (1) geometric post-processing cannot break the ceiling, the ceiling IS the learned front-end, so
+effort goes to a stronger learned front-end (better pose/depth/matching) or the pointmap paradigm, not more BA;
+(2) the shipped ICP-for-bake improves LOCAL cloud consistency but worsens GLOBAL ATE, a real tradeoff, so flipping
+the bake default to raw is a cloud-quality-vs-ATE judgment that needs a visual check, not an automatic flip.
+
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
 checkpoint with a killed-early run's worse checkpoint (0.77 m). The *deployed* artifacts (v0.11.000) are safe (baked +
