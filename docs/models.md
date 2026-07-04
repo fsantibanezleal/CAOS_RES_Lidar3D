@@ -1,17 +1,18 @@
 # Models
 
-Our OWN, trainable, model-agnostic reconstruction stack, and the full honest record of every model and every
-experiment run in this lab. The engine is model-agnostic (a registry behind one `reconstruct(spec, seed) ->
-ReconResult` contract, `data-pipeline/lidar3dlab/model/agnostic.py`); this theme documents the models that plug
-into it and the history of training them, so no experiment or negative result is ever lost.
+Our OWN, trainable, model-agnostic reconstruction stack, built around **Estela** (our depth+pose net), and the
+full honest record of every model and every experiment run in this lab. The engine is model-agnostic (a registry
+behind one `reconstruct(spec, seed) -> ReconResult` contract, `data-pipeline/lidar3dlab/model/agnostic.py`); this
+theme documents the models that plug into it and the history of training them, so no experiment or negative result
+is ever lost.
 
 | # | Page | What it establishes |
 |---|---|---|
-| 01 | [The own depth+pose model](models/01_own-depth-pose.md) | our from-scratch depth+pose network in full: the two interchangeable backbones (scratch UNet / pretrained ResNet-18), the aleatoric depth head, the Siamese pose head, the se(3) exponential, the losses, the ATE metric |
+| 01 | [Estela: the own depth+pose model](models/01_own-depth-pose.md) | our from-scratch depth+pose network in full: the two interchangeable backbones (scratch UNet / pretrained ResNet-18), the aleatoric depth head, the Siamese pose head, the se(3) exponential, the losses, the ATE metric |
 | 02 | [Model history](models/02_model-history.md) | the complete chronological record of every model/experiment: backbone, data, held-out ATE, points, what was deployed, and every negative result, so the history is preserved |
 | 03 | [Experiments log](models/03_experiments-log.md) | the machine-readable `experiments.jsonl` schema (one row per training epoch, never truncated), how to read it, and how the web Experiments page renders it |
 | 04 | [Datasets](models/04_datasets.md) | the model data: training datasets (TUM x11, ICL-NUIM, 7-Scenes), formats, the real per-dataset intrinsics, licenses, and the bigger-data roadmap |
-| 05 | [Windowed pose-graph (M-C)](models/05_windowed-pose-graph.md) | the multi-frame extension: a relative-pose measurement per window edge (consecutive + skip) fused by a differentiable pose-graph solve, the training-path pivot (supervise the measurements directly, solve forward-only at inference), and the fused-vs-chain evaluation |
+| 05 | [Estela-W: windowed pose-graph (M-C)](models/05_windowed-pose-graph.md) | the multi-frame extension: a relative-pose measurement per window edge (consecutive + skip) fused by a differentiable pose-graph solve, the training-path pivot (supervise the measurements directly, solve forward-only at inference), and the fused-vs-chain evaluation |
 
 ## Where the models live
 

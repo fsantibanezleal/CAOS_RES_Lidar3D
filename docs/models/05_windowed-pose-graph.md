@@ -1,10 +1,13 @@
-# The windowed pose-graph model (M-C)
+# Estela-W: the windowed pose-graph model (M-C)
 
-Our multi-frame extension of the depth+pose model. Where [the own depth+pose model](01_own-depth-pose.md) predicts
-one relative pose per consecutive pair and the engine chains those pairs into a trajectory, this model predicts a
-relative-pose **measurement per edge of a sliding window** (consecutive *and* skip edges) and solves for all the
-window's poses **jointly** with a differentiable pose-graph optimisation. The joint solve is what lets it beat the
-drift that pure per-pair chaining accumulates.
+The multi-frame variant of **Estela**, our depth+pose reconstruction net. Where the per-pair
+[Estela](01_own-depth-pose.md) predicts one relative pose per consecutive pair and the engine chains those pairs
+into a trajectory, Estela-W predicts a relative-pose **measurement per edge of a sliding window** (consecutive
+*and* skip edges) and solves for all the window's poses **jointly** with a differentiable pose-graph optimisation.
+The joint solve is what lets it beat the drift that pure per-pair chaining accumulates.
+
+(Estela is Spanish for the wake a moving body leaves and also a stele, a standing carved stone: the net turns a
+moving camera into a trajectory and a 3D structure. M-C / "Estela-W" is its windowed-bundle-adjustment form.)
 
 Code: `data-pipeline/lidar3dlab/model/nets/window_ba.py` (the model + the solver),
 `data-pipeline/lidar3dlab/train/train_window.py` (training + evaluation).
