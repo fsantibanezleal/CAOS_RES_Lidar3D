@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Potree, PointColorType, ClipMode, createClipSphere } from 'potree-core';
 import { b64ToF32, type Trace } from '../lib/contract.types';
-import { poseCenter, poseForward, cloudObbRender, obbAxes } from '../lib/coords';
+import { poseCenter, poseForward, cloudObbRender, obbAxes, worldToRenderBuffer } from '../lib/coords';
 import type { CameraMode, ColorMode } from './CloudViewer';
 
 // map our color toggle to a Potree material color source (RGB baked colors vs a height/elevation ramp).
@@ -102,6 +102,11 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
         fwds.push(new THREE.Vector3(fw[0], fw[1], fw[2]));
       }
       a.centers = centers; a.fwds = fwds; a.bbCenter = c; a.bbR = r;
+      // the frame-ordered cloud in the RENDER frame (matches the octree) + the cumulative per-frame point
+      // counts, so the reveal can clip to the points actually observed up to a frame (see applyReveal).
+      a.renderPts = worldToRenderBuffer(wp);
+      a.nPoints = (wp.length / 3) | 0;
+      a.frameOffsets = (trace.frame_offsets && trace.frame_offsets.length) ? trace.frame_offsets : null;
 
       // OBB diagnostic (shared coords): computed from the raw world points, drawn in the Potree three.js scene,
       // so it is directly comparable to the box the other renderers draw. If it hugs the octree, Potree's baked
@@ -145,21 +150,44 @@ export function PotreeViewer({ trace, pointSize, dark, density, reveal, cameraMo
     return Math.min(n - 1, Math.round(Math.max(0, Math.min(1, revealRef.current)) * (n - 1)));
   };
 
-  // Reveal the map progressively via clip spheres along the traversed path (potree-core has no per-point temporal
-  // filter, only spatial clipping). Points inside ANY sphere are kept (CLIP_OUTSIDE); as the reveal grows, more of
-  // the path is covered so more of the map appears. At full reveal the clip is disabled to show the complete octree.
+  // Reveal the map progressively (potree-core has no per-point temporal filter, only spatial clipping). The other
+  // renderers reveal by point COUNT: the cloud is frame-ordered and `frame_offsets[k]` is the cumulative point
+  // count up to frame k, so they draw the first m points. We reproduce that spatially: clip to a set of spheres
+  // that COVER those first m points (not the camera stations, which sit in empty air in front of the surface, the
+  // reason a partial reveal previously showed nothing). The m revealed points are frame-ordered, so partitioning
+  // them into <=30 contiguous chunks gives spatially-tight spheres (each sphere circumscribes its chunk's bbox, so
+  // every revealed point falls inside one). Points inside ANY sphere are kept (CLIP_OUTSIDE). At full reveal the
+  // clip is disabled to show the complete octree.
   const applyReveal = () => {
-    const a = api.current; if (!a || !a.pco || !a.centers?.length) return;
-    const mat = a.pco.material; const n: number = a.centers.length; const idx = revealFrame();
-    if (idx >= n - 1) {                                   // full trajectory revealed -> show the whole octree
-      mat.setClipSpheres([]); mat.clipMode = ClipMode.DISABLED; return;
-    }
-    const radius = Math.max(a.bbR * 0.5, 0.3);            // "flashlight" radius around each camera station
-    const count = Math.min(MAX_CLIP_SPHERES, idx + 1);    // subsample the traversed path to <=30 spheres
+    const a = api.current; if (!a || !a.pco || !a.renderPts) return;
+    const mat = a.pco.material; const nP: number = a.nPoints; const nFrames: number = a.centers?.length || 0;
+    const idx = revealFrame();
+    // how many frame-ordered points are observed up to this frame (exact via frame_offsets; else proportional)
+    let m = a.frameOffsets
+      ? Math.min(nP, a.frameOffsets[Math.min(idx, a.frameOffsets.length - 1)] | 0)
+      : Math.round(((idx + 1) / Math.max(1, nFrames)) * nP);
+    if (m >= nP) { mat.setClipSpheres([]); mat.clipMode = ClipMode.DISABLED; return; }  // everything -> whole octree
+    m = Math.max(1, m);
+    const pts: Float32Array = a.renderPts;
+    const chunks = Math.min(MAX_CLIP_SPHERES, m);
+    const per = Math.ceil(m / chunks);
+    // A frame's points are scattered across the whole surface it observed, so an index-contiguous chunk can span a
+    // large volume; circumscribing it exactly would blanket the scene and reveal points that are NOT yet observed.
+    // Cap the radius to a fraction of the cloud so a partial reveal stays a partial region (potree-core clips are
+    // spatial-only and capped at 30, so this is a bounded approximation of the exact per-point reveal, not equal to
+    // it, matching the documented spatial-reveal design).
+    const rCap = Math.max(a.bbR * 0.16, 0.15);
     const spheres = [] as any[];
-    for (let k = 0; k < count; k++) {
-      const i = count === 1 ? idx : Math.round((k / (count - 1)) * idx);   // even spread, always includes idx
-      spheres.push(createClipSphere(a.centers[i].clone(), radius));
+    for (let s = 0; s < m; s += per) {
+      const e = Math.min(m, s + per);
+      let minx = Infinity, miny = Infinity, minz = Infinity, maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
+      for (let i = s; i < e; i++) {
+        const x = pts[i * 3], y = pts[i * 3 + 1], z = pts[i * 3 + 2];
+        if (x < minx) minx = x; if (y < miny) miny = y; if (z < minz) minz = z;
+        if (x > maxx) maxx = x; if (y > maxy) maxy = y; if (z > maxz) maxz = z;
+      }
+      const radius = Math.min(0.5 * Math.hypot(maxx - minx, maxy - miny, maxz - minz) + 0.02, rCap);
+      spheres.push(createClipSphere(new THREE.Vector3((minx + maxx) / 2, (miny + maxy) / 2, (minz + maxz) / 2), radius));
     }
     mat.setClipSpheres(spheres); mat.clipMode = ClipMode.CLIP_OUTSIDE;
   };
