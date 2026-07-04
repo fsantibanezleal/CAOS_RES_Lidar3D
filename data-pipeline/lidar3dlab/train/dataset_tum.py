@@ -85,6 +85,7 @@ class TUMPairs(Dataset):
         K0 = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], np.float64)
         # store base image size once (assume constant 640x480 for TUM)
         self.K0, self.W0, self.H0 = K0, 640, 480
+        self.frames = frames                                  # kept so window loaders can reuse the index
         for i in range(0, len(frames) - stride, stride):
             self.samples.append((frames[i], frames[i + stride]))
         if max_pairs:
@@ -116,6 +117,38 @@ class TUMPairs(Dataset):
             "rgb0": self._load_rgb(fn0), "rgb1": self._load_rgb(fn1),
             "depth0": self._load_depth(dfn0), "rel_pose": rel.astype(np.float32), "K": self._K(),
         }
+
+
+class TUMWindows(TUMPairs):
+    """N-frame WINDOWS from a TUM sequence, for the M-C windowed trainer/eval on real indoor data. Reuses
+    TUMPairs' frame index + RGB/depth loaders; TUM ground-truth poses are already in the camera/optical frame
+    (the same convention our depth unprojection uses), so a window's absolute poses are simply
+    T_k = c2w0^{-1} c2w_k with frame 0 = identity. Lets M-C be evaluated on TUM long_office for a like-for-like
+    ATE comparison against the deployed per-pair M8 (0.28 m)."""
+
+    def __init__(self, seq_dir: str, image_size: int = 224, window: int = 6, frame_stride: int = 1,
+                 win_stride: int | None = None, max_windows: int | None = None):
+        super().__init__(seq_dir, image_size=image_size, stride=1, max_pairs=None)
+        self.window = window
+        f = self.frames
+        span = (window - 1) * frame_stride
+        step = win_stride if win_stride is not None else max(1, window - 2)
+        self.wins: list[list[int]] = [[s + k * frame_stride for k in range(window)]
+                                      for s in range(0, len(f) - span, step)]
+        if max_windows:
+            self.wins = self.wins[:max_windows]
+
+    def __len__(self) -> int:
+        return len(self.wins)
+
+    def __getitem__(self, i: int) -> dict:
+        idx = self.wins[i]
+        rgbs = np.stack([self._load_rgb(self.frames[k][0]) for k in idx])       # [N,3,H,W]
+        depths = np.stack([self._load_depth(self.frames[k][1]) for k in idx])   # [N,H,W]
+        c2w = np.stack([self.frames[k][2] for k in idx])                        # [N,4,4] camera-to-world
+        inv0 = np.linalg.inv(c2w[0])
+        poses = np.stack([inv0 @ c2w[k] for k in range(len(idx))]).astype(np.float32)   # frame 0 = identity
+        return {"rgbs": rgbs, "depths": depths.astype(np.float32), "poses": poses, "K": self._K()}
 
 
 _ICL_INTR = (481.20, 480.00, 319.50, 239.50)  # ICL-NUIM camera (fy positive-ified)

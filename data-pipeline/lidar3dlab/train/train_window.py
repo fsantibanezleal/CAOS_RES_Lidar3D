@@ -26,7 +26,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from ..model.nets.window_ba import WindowDepthPose, window_edges, window_pgo
-from .dataset_tum import TartanGroundWindows, tartanground_sequences
+from .dataset_tum import TUMWindows, TartanGroundWindows, list_sequences, tartanground_sequences
 from .train_depthpose import depth_loss, umeyama_ate
 
 
@@ -57,13 +57,11 @@ def _collate(batch: list[dict]) -> dict:
 
 
 @torch.no_grad()
-def evaluate(model: WindowDepthPose, seq_dir: str, device: torch.device, size: int, window: int,
-             skip: int, max_windows: int) -> dict:
-    """Full-trajectory ATE on a held-out sequence, composing overlapping windows (win_stride = window-1, so each
-    window shares its first frame with the previous window's last). Reports the window_pgo FUSED trajectory and,
-    as an ablation on the SAME measurements, a pure consecutive CHAIN, so the fusion gain is explicit."""
-    ds = TartanGroundWindows(seq_dir, image_size=size, window=window, win_stride=window - 1,
-                             max_windows=max_windows)
+def evaluate(model: WindowDepthPose, ds, device: torch.device, window: int, skip: int) -> dict:
+    """Full-trajectory ATE on a held-out sequence, composing overlapping windows. `ds` MUST be built with
+    win_stride = window-1, so each window shares its first frame with the previous window's last. Reports the
+    window_pgo FUSED trajectory and, as an ablation on the SAME measurements, a pure consecutive CHAIN, so the
+    fusion gain is explicit."""
     if len(ds) < 2:
         return {"ate_fused": float("nan"), "ate_chain": float("nan"), "edge_err": float("nan"), "windows": len(ds)}
     edges = window_edges(window, skip=skip).to(device)
@@ -118,6 +116,8 @@ def main() -> None:
     ap.add_argument("--init", type=str, default="", help="warm-start depth+geo from a checkpoint (reuse the M8 depth net)")
     ap.add_argument("--freeze_depth", action="store_true", help="freeze backbone+depth decoder, train ONLY the geo head")
     ap.add_argument("--max_windows", type=int, default=None, help="cap windows per sequence (smoke/quick)")
+    ap.add_argument("--use_tum", action="store_true", help="also train on TUM RGB-D windows (real indoor; needed to compare with the TUM-trained M8)")
+    ap.add_argument("--eval_tum", action="store_true", help="also evaluate on the held-out TUM long_office sequence (like-for-like vs the M8 0.28 m)")
     ap.add_argument("--pgo_iters", type=int, default=5, help="window_pgo iterations at inference")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--smoke", action="store_true", help="1 tiny step + 1 eval window, no checkpoint")
@@ -126,14 +126,29 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_cuda = device.type == "cuda"
     dtype = torch.bfloat16 if (use_cuda and torch.cuda.get_device_capability()[0] >= 8) else torch.float32
-    seqs = tartanground_sequences()
-    if not seqs:
-        raise SystemExit("no TartanGround sequences under LIDAR3D_DATA_ROOT/train/tartanground (download first)")
-    val_seq = seqs[-1]
-    train_seqs = seqs[:-1] or seqs
     mw = 4 if args.smoke else args.max_windows
-    datasets = [TartanGroundWindows(s, image_size=args.size, window=args.window, max_windows=mw)
-                for s in train_seqs]
+    W, S = args.window, args.size
+    ev = 2 if args.smoke else 200                       # windows per eval sequence
+    datasets: list = []
+    val_sets: list = []                                 # (name, dataset) held out for ATE; first = checkpoint selector
+    tg = tartanground_sequences()
+    if tg:
+        val_tg = tg[-1]
+        datasets += [TartanGroundWindows(s, image_size=S, window=W, max_windows=mw) for s in (tg[:-1] or tg)]
+        val_sets.append((os.path.basename(val_tg),
+                         TartanGroundWindows(val_tg, image_size=S, window=W, win_stride=W - 1, max_windows=ev)))
+    tum_all = list_sequences()
+    val_tum = next((s for s in tum_all if "long_office" in s), tum_all[-1] if tum_all else None)
+    if args.use_tum and tum_all:
+        datasets += [TUMWindows(s, image_size=S, window=W, max_windows=mw) for s in tum_all if s != val_tum]
+    if args.eval_tum and val_tum:                       # TUM long_office eval, comparable to the M8 0.28 m
+        val_sets.insert(0, (os.path.basename(val_tum),  # make it the checkpoint selector (like-for-like)
+                            TUMWindows(val_tum, image_size=S, window=W, win_stride=W - 1, max_windows=ev)))
+    elif args.eval_tum:
+        print("warn: --eval_tum requested but no TUM sequences found under LIDAR3D_DATA_ROOT/train/tum-rgbd")
+    if not datasets:
+        raise SystemExit("no training windows (need TartanGround under LIDAR3D_DATA_ROOT/train/tartanground, "
+                         "or --use_tum with TUM sequences)")
     train = ConcatDataset(datasets)
     nworkers = 0 if args.smoke else max(0, args.workers)
     dl = DataLoader(train, batch_size=(2 if args.smoke else args.batch), shuffle=True, drop_last=True,
@@ -156,7 +171,7 @@ def main() -> None:
     edges = window_edges(args.window, skip=args.skip).to(device)
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, args.epochs * max(1, len(dl))))
-    print(f"device={device} dtype={dtype} windows={len(train)} val={os.path.basename(val_seq)} "
+    print(f"device={device} dtype={dtype} windows={len(train)} val=[{','.join(n for n, _ in val_sets)}] "
           f"N={args.window} edges={len(edges)} params={sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
     out_dir = Path(os.environ.get("LIDAR3D_MODELS_ROOT", "models")) / "own-depthpose"
@@ -199,25 +214,28 @@ def main() -> None:
             if args.smoke and steps >= 1:
                 break
         if args.smoke:
-            r = evaluate(model, val_seq, device, args.size, args.window, args.skip, max_windows=2)
-            print(f"SMOKE eval: {r}")
+            name, ds = val_sets[0]
+            print(f"SMOKE eval[{name}]: {evaluate(model, ds, device, args.window, args.skip)}")
             print("SMOKE OK")
             return
-        r = evaluate(model, val_seq, device, args.size, args.window, args.skip, max_windows=200)
-        improved = r["ate_fused"] < best
-        print(f"[epoch {ep}] ATE fused={r['ate_fused']:.4f}m chain={r['ate_chain']:.4f}m "
-              f"edge_err={r['edge_err']:.4f}m windows={r['windows']}" + (" (best, saved)" if improved else ""))
+        results = [(name, evaluate(model, ds, device, args.window, args.skip)) for name, ds in val_sets]
+        primary = results[0][1]                          # first val set (TUM long_office if --eval_tum) selects best
+        improved = primary["ate_fused"] < best
+        line = "  ".join(f"{nm}[fused={r['ate_fused']:.4f} chain={r['ate_chain']:.4f} edge={r['edge_err']:.4f}]"
+                         for nm, r in results)
+        print(f"[epoch {ep}] {line}" + (" (best, saved)" if improved else ""))
         with open(out_dir / "experiments.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": _dt.datetime.now().isoformat(timespec="seconds"), "model": "window-mc",
-                                "backbone": args.backbone, "epoch": ep, "window": args.window, "skip": args.skip,
-                                "ate_fused": round(r["ate_fused"], 4), "ate_chain": round(r["ate_chain"], 4),
-                                "edge_err": round(r["edge_err"], 4), "is_best": improved,
-                                "val_seq": os.path.basename(val_seq)}) + "\n")
+            for nm, r in results:
+                f.write(json.dumps({"ts": _dt.datetime.now().isoformat(timespec="seconds"), "model": "window-mc",
+                                    "backbone": args.backbone, "epoch": ep, "window": args.window, "skip": args.skip,
+                                    "ate_fused": round(r["ate_fused"], 4), "ate_chain": round(r["ate_chain"], 4),
+                                    "edge_err": round(r["edge_err"], 4), "is_best": (improved and nm == results[0][0]),
+                                    "val_seq": nm}) + "\n")
         if improved:
-            best = r["ate_fused"]
+            best = primary["ate_fused"]
             ckpt = {"model": model.state_dict(), "backbone": args.backbone, "window": args.window,
-                    "skip": args.skip, "pgo_iters": args.pgo_iters, "ate_fused": r["ate_fused"],
-                    "ate_chain": r["ate_chain"]}
+                    "skip": args.skip, "pgo_iters": args.pgo_iters, "ate_fused": primary["ate_fused"],
+                    "ate_chain": primary["ate_chain"], "val_seq": results[0][0]}
             torch.save(ckpt, out_dir / f"window-mc-{args.backbone}-{run_id}.pt")
             torch.save(ckpt, out_dir / "window-mc.pt")
     print(f"best ATE fused={best:.4f}m -> {out_dir / 'window-mc.pt'}")
