@@ -206,6 +206,7 @@ class TartanGroundPairs(Dataset):
         fx = fy = 320.0 * (image_size / 640.0)
         cx = cy = 320.0 * (image_size / 640.0)
         self.K0 = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], np.float32)   # already at working res
+        self.frames = frames                                                    # kept so window loaders can reuse
         self.samples = [(frames[i], frames[i + stride]) for i in range(0, len(frames) - stride, stride)]
         if max_pairs:
             self.samples = self.samples[:max_pairs]
@@ -232,6 +233,47 @@ class TartanGroundPairs(Dataset):
         rel = (p.T @ rel_ned @ p).astype(np.float32)           # -> optical frame (matches our depth unprojection)
         return {"rgb0": self._rgb(ip0), "rgb1": self._rgb(ip1),
                 "depth0": self._depth(dp0), "rel_pose": rel, "K": self.K0.copy()}
+
+
+class TartanGroundWindows(TartanGroundPairs):
+    """N-frame WINDOWS from a TartanGround trajectory, for the M-C windowed pose-graph trainer (#22).
+
+    Reuses TartanGroundPairs' frame index + RGB/depth loaders + NED->optical convention, but each item is a
+    contiguous window of `window` frames with their ABSOLUTE poses anchored at frame 0 = identity (optical frame,
+    so they compose with our depth unprojection). The trainer builds the window's edge set (consecutive + skip)
+    and supervises the geo head on each edge's ground-truth relative pose T_i^{-1} T_j. Windows overlap by
+    `window - win_stride` frames so a full trajectory can be recomposed at inference from their shared frames."""
+
+    def __init__(self, seq_dir: str, image_size: int = 224, window: int = 6, frame_stride: int = 1,
+                 win_stride: int | None = None, max_windows: int | None = None,
+                 camera: str = "lcam_front", max_depth: float = 10.0):
+        super().__init__(seq_dir, image_size=image_size, stride=1, max_pairs=None,
+                         camera=camera, max_depth=max_depth)
+        self.window = window
+        f = self.frames
+        span = (window - 1) * frame_stride                       # index distance frame0 -> frame_{N-1}
+        step = win_stride if win_stride is not None else max(1, window - 2)   # default: overlap by 2 frames
+        self.wins: list[list[int]] = []
+        for s in range(0, len(f) - span, step):
+            self.wins.append([s + k * frame_stride for k in range(window)])
+        if max_windows:
+            self.wins = self.wins[:max_windows]
+
+    def __len__(self) -> int:
+        return len(self.wins)
+
+    def __getitem__(self, i: int) -> dict:
+        idx = self.wins[i]
+        rgbs = np.stack([self._rgb(self.frames[k][0]) for k in idx])           # [N,3,H,W]
+        depths = np.stack([self._depth(self.frames[k][1]) for k in idx])       # [N,H,W]
+        c2w = np.stack([self.frames[k][2] for k in idx])                       # [N,4,4] NED cam-to-world
+        p = np.eye(4)
+        p[:3, :3] = _NED_FROM_OPT
+        inv0 = np.linalg.inv(c2w[0])
+        # absolute pose of each frame in frame 0, converted NED->optical: T_k = P^T (c2w0^{-1} c2w_k) P
+        poses = np.stack([p.T @ (inv0 @ c2w[k]) @ p for k in range(len(idx))]).astype(np.float32)
+        return {"rgbs": rgbs, "depths": depths.astype(np.float32),
+                "poses": poses, "K": self.K0.copy()}
 
 
 def tartanground_sequences() -> list[str]:

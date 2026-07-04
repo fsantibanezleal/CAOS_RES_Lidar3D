@@ -126,24 +126,36 @@ class WindowDepthPose(nn.Module):
             grid_feat = self.enc.out_ch[3]
         self.geo = GeoPoseHead(feat=grid_feat)
 
-    def forward(self, rgbs: torch.Tensor, k: torch.Tensor, edges: torch.Tensor) -> dict:
-        """rgbs: [N,3,H,W] (one window). k: [3,3]. edges: [E,2] long (i,j frame indices).
-        Returns poses [N,4,4] (frame 0 = identity anchor), depth [N,1,H,W], logvar, and the raw measurements."""
-        n = rgbs.shape[0]
+    def measure_edges(self, rgbs: torch.Tensor, k: torch.Tensor, edges: torch.Tensor) -> dict:
+        """Per-frame depth + a raw relative-pose MEASUREMENT per window edge, WITHOUT the pose-graph solve.
+        rgbs: [N,3,H,W] (one window). k: [3,3]. edges: [E,2] long (i,j frame indices). Returns z_rel [E,4,4]
+        (measured T_i^{-1} T_j), weight [E], depth [N,1,H,W], logvar [N,1,H,W]. This is the piece the trainer
+        supervises directly (per-edge relative-pose loss), so the geo head learns good measurements with only a
+        first-order backward; window_pgo (a second-order differentiable solve) is used forward-only at inference."""
         feats = self.enc(rgbs)                              # list of levels, each [N,C,h,w]
         depth, logvar = self.dec(feats, rgbs.shape[-2:])    # [N,1,H,W]
         gf = feats[self._plevel]                            # [N,C,h,w] grid features for correspondences
         ei, ej = edges[:, 0], edges[:, 1]
         ke = k.reshape(1, 3, 3).expand(edges.shape[0], 3, 3).contiguous()
         z_rel, w = self.geo.measure(gf[ei], gf[ej], depth[ei], depth[ej], ke)  # [E,4,4] (T_i^-1 T_j), [E]
-        poses = window_pgo(z_rel, edges, w, n, iters=self.iters)               # [N,4,4] jointly optimised
-        return {"poses": poses, "depth": depth, "logvar": logvar, "z_rel": z_rel, "weight": w}
+        return {"z_rel": z_rel, "weight": w, "depth": depth, "logvar": logvar}
+
+    def forward(self, rgbs: torch.Tensor, k: torch.Tensor, edges: torch.Tensor) -> dict:
+        """rgbs: [N,3,H,W] (one window). k: [3,3]. edges: [E,2] long (i,j frame indices).
+        Returns poses [N,4,4] (frame 0 = identity anchor), depth [N,1,H,W], logvar, and the raw measurements.
+        window_pgo runs here as the inference fusion (forward-only in eval / no_grad); training instead calls
+        measure_edges and supervises the measurements directly (see the class docstring / train_window.py)."""
+        m = self.measure_edges(rgbs, k, edges)
+        poses = window_pgo(m["z_rel"], edges, m["weight"], rgbs.shape[0], iters=self.iters)  # [N,4,4] joint
+        return {"poses": poses, "depth": m["depth"], "logvar": m["logvar"],
+                "z_rel": m["z_rel"], "weight": m["weight"]}
 
 
 def window_edges(n: int, skip: int = 2) -> torch.Tensor:
     """The window's edge set: all consecutive pairs plus skip connections up to `skip` apart. The skip edges are
-    the extra constraints that let the joint solve beat a pure consecutive chain."""
-    e = [(i, j) for j in range(1, skip + 1) for i in range(n - j)]
+    the extra constraints that let the joint solve beat a pure consecutive chain. Each edge is (i, i+j) for
+    distance j in 1..skip, so for n=6, skip=2: (0,1),(1,2),(2,3),(3,4),(4,5) + (0,2),(1,3),(2,4),(3,5)."""
+    e = [(i, i + j) for j in range(1, skip + 1) for i in range(n - j)]
     return torch.tensor(e, dtype=torch.long)
 
 
