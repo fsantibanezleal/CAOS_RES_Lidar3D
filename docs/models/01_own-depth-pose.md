@@ -1,10 +1,15 @@
-# The own depth+pose model
+# Estela: the own depth+pose model
 
-Our own, from-scratch, trainable model for streaming reconstruction from an ordered RGB stream. It predicts, per
-frame, a dense metric depth with a learned confidence, and, per consecutive pair, a relative camera pose. The
-inference engine (`model/own_engine.py`) accumulates the relative poses into a camera-to-world trajectory and
-unprojects each frame's depth into a single fused, RGB-colored world point cloud with our tested geometry
+**Estela** is our own, from-scratch, trainable model for streaming reconstruction from an ordered RGB stream. It
+predicts, per frame, a dense metric depth with a learned confidence, and, per consecutive pair, a relative camera
+pose. The inference engine (`model/own_engine.py`) accumulates the relative poses into a camera-to-world trajectory
+and unprojects each frame's depth into a single fused, RGB-colored world point cloud with our tested geometry
 (`model/geom.py`). No vendored reconstruction model is involved.
+
+The name (Spanish for the wake a moving body leaves, and also a stele, a standing carved stone) captures what the
+model produces: a moving camera's trajectory and the 3D structure it leaves behind. The multi-frame windowed
+variant is [Estela-W (M-C)](05_windowed-pose-graph.md). The internal code symbol is still `OwnDepthPose`; a rename
+to match the brand is a tracked follow-up.
 
 Code: `data-pipeline/lidar3dlab/model/nets/own_depthpose.py`.
 

@@ -8,7 +8,7 @@ export function Footer({ lang }: { lang: Lang }) {
       <span>Lidar&nbsp;3D · CAOS research lab</span>
       <span className="ver">v{APP_VERSION}</span>
       <span>·</span>
-      <span>{en ? 'Engines' : 'Motores'}: {en ? 'our own depth+pose net' : 'nuestra red profundidad+pose'} · {en ? 'Open3D ICP' : 'Open3D ICP'} · <a href="https://github.com/Robbyant/lingbot-map" target="_blank" rel="noreferrer">lingbot-map</a> {en ? 'SOTA ref' : 'ref SOTA'} (Apache-2.0)</span>
+      <span>{en ? 'Engines' : 'Motores'}: {en ? 'Estela (our depth+pose net)' : 'Estela (nuestra red profundidad+pose)'} · {en ? 'Open3D ICP' : 'Open3D ICP'} · <a href="https://github.com/Robbyant/lingbot-map" target="_blank" rel="noreferrer">lingbot-map</a> {en ? 'SOTA ref' : 'ref SOTA'} (Apache-2.0)</span>
       <span>·</span>
       <a href="https://github.com/fsantibanezleal/CAOS_RES_Lidar3D" target="_blank" rel="noreferrer">GitHub</a>
       <span>·</span>

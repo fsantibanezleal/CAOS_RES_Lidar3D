@@ -39,9 +39,9 @@ def _own_model_label() -> str:
         data = "TUM RGB-D + ICL-NUIM" if m.get("use_icl") else "TUM RGB-D"
         data += " + TartanGround" if m.get("use_tartan") else ""
         ate = f", {m['val_ate']:.2f} m held-out ATE" if m.get("val_ate") else ""
-        return f"OUR depth+pose net ({bb} + our decoder/pose, trained on {data}{ate})"
+        return f"Estela ({bb} + our decoder/pose, trained on {data}{ate})"
     except Exception:  # noqa: BLE001
-        return "OUR depth+pose net (our decoder/pose, trained on TUM RGB-D)"
+        return "Estela (our decoder/pose, trained on TUM RGB-D)"
 
 
 def _row(spec) -> dict:

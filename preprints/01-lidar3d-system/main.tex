@@ -36,7 +36,7 @@ where we can innovate. This paper documents the system, the methodology, the dat
 \section{System}
 \textbf{Model-agnostic engine.} A registry exposes control (synthetic), classical (ICP), SOTA-reference, and
 \emph{ours} engines behind one contract, so they are directly comparable. \\
-\textbf{Our depth+pose network.} A shared encoder feeds (i) a depth decoder emitting metric depth
+\textbf{Estela, our depth+pose network.} A shared encoder feeds (i) a depth decoder emitting metric depth
 $\hat D = D_{\max}\sigma(\cdot)$ with an aleatoric log-variance (confidence $c=e^{-\log\hat\sigma^2}$ used to weight
 the loss and filter the cloud), and (ii) a relative-pose head regressing an $\mathfrak{se}(3)$ tangent mapped to
 $SE(3)$ by our Rodrigues exponential. Three interchangeable backbones share the forward signature: a from-scratch
