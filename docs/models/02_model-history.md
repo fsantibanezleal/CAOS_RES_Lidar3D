@@ -47,16 +47,30 @@ differentiable Procrustes/BA core, metric-depth seeding, the inference-time ICP 
 **M-C: a windowed multi-frame differentiable BA** (DPVO-lite). Note: the deployed regression + inference-ICP model
 (M8, 0.28 m) remains the practical best for the per-pair approach.
 
-**M-C core implemented + validated (#22, in progress).** `model/nets/window_ba.py` is the differentiable
+**M-C core implemented + validated (#22).** `model/nets/window_ba.py` is the differentiable
 **windowed pose-graph optimiser**: given per-edge relative-pose measurements over a window (consecutive AND
 non-consecutive skip edges) with confidences, it solves for the absolute poses jointly by a few Gauss-Newton
 iterations (autograd Jacobian, differentiable linear solve, se(3) tangent updates). Synthetic self-test (6-frame
 window, ~2 deg / 3 cm per-edge noise): chained single-pair drift **0.0775 m** vs windowed PGO **0.0304 m = 61 %
 less drift**, and gradients flow back to the measurements (the geo head can be trained THROUGH the optimiser).
-This is the mechanism the decisive finding pointed to, proven in isolation. Remaining to finish M-C: a
-`WindowGeoPoseHead` (emit per-edge measurements from the geo correspondence machinery over a window), a windowed
-dataset (N-frame windows), and a windowed training loss (pose ATE over the window + reprojection + the depth NLL),
-then train + measure ATE vs the 0.28 m per-pair ceiling.
+This is the mechanism the decisive finding pointed to, proven in isolation.
+
+**M-C trained + evaluated (#22, the definitive run) = Estela-W.** Built the training path:
+`WindowDepthPose.measure_edges` (depth + a per-edge geometric measurement), `TartanGroundWindows` / `TUMWindows`
+(N-frame windows), and `train/train_window.py`. The training-path pivot: back-propagating through `window_pgo`
+(a second-order differentiable solve) went NaN with an untrained head, so the trainer supervises the per-edge
+measurements DIRECTLY (first-order, stable) and runs `window_pgo` forward-only at inference. Also fixed a real bug
+in the core (`window_edges` emitted `(i, distance)` instead of the frame pair `(i, i+j)`; latent because the tests
+built edges by hand). Trained on TartanGround + TUM windows (warm-started from the M8 depth net), evaluated on the
+held-out TUM `long_office`:
+- **The fusion works**: `window_pgo` cuts per-window drift **45 %** vs chaining the SAME measurements (0.254 m vs
+  0.464 m; 18 % on TartanGround) and halves the full-trajectory ATE (3.16 m vs 6.01 m); per-edge error fell to
+  ~0.20 m with no NaN.
+- **But it does NOT beat M8**: absolute ATE 3.16 m is an order of magnitude above the deployed per-pair M8
+  (0.28 m), because it fuses the *geometric* front-end (M-B, ~1.2 m-class per pair), not the Siamese + ICP head.
+  The windowed BA is validated as a drift reducer, but the front-end is the ceiling; the next step is to fuse the
+  Siamese / ICP-refined edges. `window-mc.pt` is kept separate (own-depthpose.pt = M8 stays LIVE). Full write-up:
+  [Estela-W](05_windowed-pose-graph.md).
 
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m

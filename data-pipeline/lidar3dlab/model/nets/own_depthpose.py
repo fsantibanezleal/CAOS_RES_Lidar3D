@@ -314,8 +314,11 @@ class GeoPoseHead(nn.Module):
         self.conf = nn.Sequential(nn.Conv2d(feat, 64, 1), nn.GELU(), nn.Conv2d(64, 1, 1))
         self.temp = nn.Parameter(torch.tensor(3.0))
 
-    def forward(self, f0: torch.Tensor, f1: torch.Tensor, d0: torch.Tensor, d1: torch.Tensor,
-                k: torch.Tensor) -> torch.Tensor:
+    def measure(self, f0: torch.Tensor, f1: torch.Tensor, d0: torch.Tensor, d1: torch.Tensor,
+                k: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """The reusable per-pair geometric measurement: returns (z01, weight). z01 = frame0->frame1 relative pose
+        in our convention (rel maps frame1->frame0, = inv of the Procrustes frame0->frame1); weight = a scalar
+        [B] confidence for that measurement. The window optimiser (M-C) calls this once per edge."""
         b, _, h, w = f0.shape
         hi, wi = d0.shape[-2:]
         q = F.normalize(self.q(f0), dim=1).flatten(2)                 # [B,proj,N]
@@ -336,7 +339,11 @@ class GeoPoseHead(nn.Module):
         p1 = attn @ p1_all                                            # [B,N,3] soft 3D correspondence per frame-0 pt
         conf = self.conf(f0).flatten(2).squeeze(1).sigmoid() * attn.max(-1).values   # descriptor conf x match peak
         t01 = weighted_procrustes(p0, p1, conf + 1e-4)               # frame0 -> frame1
-        return torch.linalg.inv(t01)                                 # our convention: rel maps frame1 -> frame0
+        return torch.linalg.inv(t01), conf.mean(1)                    # rel (frame1->frame0), scalar weight [B]
+
+    def forward(self, f0: torch.Tensor, f1: torch.Tensor, d0: torch.Tensor, d1: torch.Tensor,
+                k: torch.Tensor) -> torch.Tensor:
+        return self.measure(f0, f1, d0, d1, k)[0]
 
 
 class OwnDepthPose(nn.Module):
