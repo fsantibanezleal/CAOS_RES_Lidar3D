@@ -123,4 +123,58 @@ CASES: list[Case] = [
          "the SAME desk sweep as OWN_tum_desk with the real Kinect depth integrated: 0.037 m ATE (vs 0.119 m "
          "RGB-only), the cleanest demonstration of what a depth sensor buys",
          "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    Case("RGBD_tum_desk2", "track B: RGB + sensor depth (Kinect)",
+         SequenceSpec("RGBD_tum_desk2",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg2_desk"),
+                      n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
+                      intrinsics=_TUM2, max_render_depth=6.0),
+         "the SAME wider desk loop as OWN_tum_desk2 with the Kinect depth integrated: Track B on a bigger "
+         "workspace with more depth range",
+         "real", dataset="TUM RGB-D (freiburg2_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    Case("RGBD_tum_xyz", "track B: RGB + sensor depth (Kinect)",
+         SequenceSpec("RGBD_tum_xyz",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_xyz"),
+                      n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
+                      intrinsics=_TUM1, max_render_depth=5.0),
+         "the SAME xyz-calibration sweep as OWN_tum_xyz with the Kinect depth integrated: tight motion, the "
+         "cleanest geometry test",
+         "real", dataset="TUM RGB-D (freiburg1_xyz, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    Case("RGBD_tum_pioneer", "track B: RGB + sensor depth (Kinect)",
+         SequenceSpec("RGBD_tum_pioneer",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg2_pioneer_slam"),
+                      n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
+                      intrinsics=_TUM2, max_render_depth=6.0),
+         "the SAME robot SLAM run as OWN_tum_pioneer with the Kinect depth integrated: Track B on the hardest "
+         "drift test (0.024 m validated vs 0.031 m RGB-only)",
+         "real", dataset="TUM RGB-D (freiburg2_pioneer_slam, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
 ]
+
+# ---- scenario model: a SCENARIO is the input data (a scene captured with specific sensors); a METHOD is what we
+# apply to it. Cases are (scenario, method) pairs. The web groups by scenario and offers the methods its data
+# supports: RGB-only scenarios offer only Track A; RGB+depth scenarios offer Track A (using only the RGB) AND
+# Track B (integrating the sensor depth); LiDAR-only scenarios offer classical ICP odometry (no camera, no track);
+# synthetic controls validate the pipeline. `SCENE_OF` maps case -> (scene id, method label, inputs). ----
+SCENE_OF: dict[str, tuple[str, str, str]] = {
+    "SYN_orbit": ("syn_corridor", "synthetic control (CPU)", "synthetic"),
+    "LID_synthetic": ("lidar_corridor", "classical ICP odometry (point-to-plane)", "lidar"),
+    "kitti_lidar": ("kitti00", "classical ICP odometry (point-to-plane)", "lidar"),
+    "OWN_tum_desk": ("tum_desk", "track A: Estela, RGB-only", "rgb+depth"),
+    "RGBD_tum_desk": ("tum_desk", "track B: sensor RGB-D", "rgb+depth"),
+    "OWN_tum_office": ("tum_office", "track A: Estela, RGB-only", "rgb+depth"),
+    "RGBD_tum_office": ("tum_office", "track B: sensor RGB-D", "rgb+depth"),
+    "OWN_tum_desk2": ("tum_desk2", "track A: Estela, RGB-only", "rgb+depth"),
+    "RGBD_tum_desk2": ("tum_desk2", "track B: sensor RGB-D", "rgb+depth"),
+    "OWN_tum_xyz": ("tum_xyz", "track A: Estela, RGB-only", "rgb+depth"),
+    "RGBD_tum_xyz": ("tum_xyz", "track B: sensor RGB-D", "rgb+depth"),
+    "OWN_tum_pioneer": ("tum_pioneer", "track A: Estela, RGB-only", "rgb+depth"),
+    "RGBD_tum_pioneer": ("tum_pioneer", "track B: sensor RGB-D", "rgb+depth"),
+    # 7-Scenes + ICL ship depth on disk too, but the Track B loader currently reads the TUM layout only; until
+    # that loader lands these scenarios honestly offer Track A alone (inputs still say rgb+depth).
+    "OWN_7scenes_heads": ("7scenes_heads", "track A: Estela, RGB-only", "rgb+depth"),
+    "OWN_7scenes_stairs": ("7scenes_stairs", "track A: Estela, RGB-only", "rgb+depth"),
+    "OWN_icl_living": ("icl_living", "track A: Estela, RGB-only", "rgb+depth"),
+    "oxford": ("oxford", "track A: pointmap SOTA reference", "rgb"),
+    "university": ("university", "track A: pointmap SOTA reference", "rgb"),
+    "loop": ("loop", "track A: pointmap SOTA reference", "rgb"),
+    "courthouse": ("courthouse", "track A: pointmap SOTA reference", "rgb"),
+}

@@ -3,6 +3,20 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.002] · 2026-07-05
+
+### Changed
+- **Scenario -> Method model in the App** (Felipe's correction: a scenario is the INPUT DATA; a track is a METHOD
+  applied to it). The selector is now "Scenario (input data)" grouped by what was captured (RGB + depth / RGB only /
+  LiDAR only / synthetic), and a "Method (what its data supports)" chip row offers every method the scenario's
+  data supports: RGB+depth scenarios offer Track A (uses only the RGB) AND Track B (integrates the sensor depth);
+  RGB-only scenarios offer Track A alone (Track B not applicable without a sensor); LiDAR-only scenarios run
+  classical point-to-plane ICP odometry (no camera, no track); synthetic controls validate the pipeline.
+
+### Added
+- Track B baked for the remaining TUM RGB-D scenarios: RGBD_tum_desk2, RGBD_tum_xyz, RGBD_tum_pioneer (+ Potree
+  octrees), so every TUM scenario now offers both methods (19 cases total).
+
 ## [0.13.001] · 2026-07-05
 
 ### Added
