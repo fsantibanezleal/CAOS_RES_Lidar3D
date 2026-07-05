@@ -3,6 +3,33 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.000] · 2026-07-05
+
+### Added
+- **Track B: RGB + sensor depth (the two-track model family).** New `rgbd-sensor` engine (SIFT + PnP RANSAC on
+  the real Kinect depth, metric by construction, so the monocular-scale blocker disappears at the source) with
+  the M-C differentiable windowed pose-graph fusing the metric edges (its first production use; a further 7-26%
+  drift cut over the plain chain). Cases `RGBD_tum_office` + `RGBD_tum_desk` mirror the RGB-only `OWN_*` scenes
+  for an honest side-by-side: 0.024-0.085 m ATE vs 0.28 m RGB-only. Docs: `docs/models/06_rgbd-track-b.md`.
+- The model name **Estela** across the presentation surface (Footer, Benchmark, Methodology, Implementation,
+  ArchModal, manifests, README, preprint); the windowed variant is Estela-W.
+- Site content for the 2026-07-04 research campaign (EN/ES): model-history rows M-C (Estela-W, fusion -45%
+  per-window drift, front-end is the ceiling), EXP (the honest probes: geometric post-processing worsens the
+  deployed trajectory; the vendored pointmap ties Estela in shape under Sim(3) but is up-to-scale; the DA-V2
+  oracle shows a ~10x ceiling blocked only by the measured monocular scale ambiguity), RGBD (Track B live);
+  the Benchmark ladder Track B row; Experiments Track A/B case entries.
+- `train/eval_refine_modes.py`: reusable refinement-ladder ATE benchmark (raw / ICP / windowed BA / global PGO).
+- 4 engine tests (chain pose-hold, fusion-equals-chain, short-sequence fallback, RGB-D root contract).
+
+### Fixed
+- Per-frame panel empty on the lingbot scenes: oxford/university/loop/courthouse re-baked with the current
+  engine (49 RGB + 49 depth keyframes; the stale bakes carried 4 depth and 0 RGB).
+- LiDAR cases now explain the missing RGB tab ("the sensor is a laser, there is no RGB stream") instead of
+  silently hiding it.
+- Latent frame double-count in CONTRACT 1 on case-insensitive filesystems (`*.png` + `*.PNG` globbed
+  separately); counts deduped by path set, courthouse manifest corrected.
+- CONTRACT 1 + preprocess accept a TUM RGB-D sequence ROOT (frames under `rgb/`).
+
 ## [0.12.003] · 2026-07-03
 
 ### Fixed
