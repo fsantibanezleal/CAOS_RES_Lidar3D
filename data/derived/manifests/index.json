@@ -1,8 +1,18 @@
 {
   "schema": "lidar3d.index/v1",
-  "engine_version": "0.13.001",
-  "n_cases": 19,
+  "engine_version": "0.13.002",
+  "n_cases": 21,
   "cases": [
+    {
+      "case_id": "DICP_tum_desk",
+      "category": "classical: depth-only ICP (no RGB in the pose)",
+      "manifest_path": "manifests/DICP_tum_desk.json"
+    },
+    {
+      "case_id": "DICP_tum_office",
+      "category": "classical: depth-only ICP (no RGB in the pose)",
+      "manifest_path": "manifests/DICP_tum_office.json"
+    },
     {
       "case_id": "LID_synthetic",
       "category": "sensor-only: LiDAR ICP odometry (no camera)",

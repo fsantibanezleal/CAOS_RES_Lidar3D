@@ -38,6 +38,11 @@ def _rgbd_sensor() -> Reconstruct:
     return reconstruct
 
 
+def _depth_icp() -> Reconstruct:
+    from .depth_icp_engine import reconstruct
+    return reconstruct
+
+
 # name -> lazy factory. `kind` documents where it sits on the ladder (classical / SOTA-reference / ours).
 ENGINES: dict[str, Callable[[], Reconstruct]] = {
     "synthetic": _synthetic,        # procedural CPU control (CI-safe)
@@ -45,10 +50,11 @@ ENGINES: dict[str, Callable[[], Reconstruct]] = {
     "lingbot": _lingbot,            # SOTA reference (vendored), wrapped behind this contract
     "own-depthpose": _own_depthpose,  # OURS: trained-from-scratch depth+pose (train/train_depthpose.py)
     "rgbd-sensor": _rgbd_sensor,    # Track B: RGB + real sensor depth (metric by construction, no scale ambiguity)
+    "depth-icp": _depth_icp,        # classical depth-only: point-to-plane ICP on the sensor depth (no RGB in the pose)
 }
 
 KIND = {"synthetic": "control", "lidar": "classical", "lingbot": "sota-reference", "own-depthpose": "ours",
-        "rgbd-sensor": "classical"}
+        "rgbd-sensor": "classical", "depth-icp": "classical"}
 
 
 def get_engine(name: str) -> Reconstruct:
