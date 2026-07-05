@@ -31,21 +31,18 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [showCones, setShowCones] = useState(true);
   const [showTraj, setShowTraj] = useState(true);
   const [showObb, setShowObb] = useState(false); // OBB + RGB axes overlay to compare the coordinate frame across renderers
-  const [track, setTrack] = useState<TrackId>('all'); // FIRST-LEVEL selector: which model track you are looking at
   const raf = useRef(0);
   const isLidarCase = !!manifest && /lidar/i.test(manifest.category); // laser sensor: baked colors are a height ramp, no camera images exist
 
   useEffect(() => {
     loadIndex().then((ix) => { setIndex(ix); setSel(ix.cases[0]?.case_id ?? ''); }).catch((e) => setErr(String(e)));
   }, []);
-  // FIRST-LEVEL track routing: which model family a case belongs to, derived from its category string
-  type TrackId = 'all' | 'A' | 'B' | 'sensor' | 'control';
-  function trackOf(cat: string): TrackId {
-    if (/track b/i.test(cat)) return 'B';
-    if (/track a/i.test(cat)) return 'A';
-    if (/sensor-only/i.test(cat)) return 'sensor';
-    return 'control';
-  }
+  // SCENARIO -> METHOD model. A scenario is the input data (a scene captured with specific sensors); a method is
+  // what we apply to it. RGB-only scenarios support Track A only; RGB+depth scenarios support Track A (using only
+  // the RGB) AND Track B (integrating the sensor depth); LiDAR-only scenarios support classical ICP odometry (no
+  // camera, no track); synthetic controls validate the pipeline. Mirrors cases/example_case.py SCENE_OF.
+  type SceneInputs = 'rgb' | 'rgb+depth' | 'lidar' | 'synthetic';
+  type SceneDef = { id: string; label: string; inputs: SceneInputs; methods: { caseId: string; label: string }[] };
   useEffect(() => {
     if (!sel) return;
     setTrace(null); stopPlay(); setReveal(1);
@@ -72,20 +69,33 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
     raf.current = requestAnimationFrame(step);
   }
 
-  const byCat = useMemo(() => {
-    const o: Record<string, string[]> = {};
-    index?.cases.forEach((c) => {
-      if (track !== 'all' && trackOf(c.category) !== track) return;
-      (o[c.category] ??= []).push(c.case_id);
+  // scenario table: id -> {inputs, methods}. Derived from case ids + categories (stable, no extra fetch).
+  const SCENES = useMemo<SceneDef[]>(() => {
+    if (!index) return [];
+    const scene = (cid: string): [string, string, SceneInputs, string] => {
+      // [scene id, scene label, inputs, method label]
+      if (cid === 'SYN_orbit') return ['syn_corridor', 'Synthetic corridor (control)', 'synthetic', 'synthetic control (CPU)'];
+      if (cid === 'LID_synthetic') return ['lidar_corridor', 'LiDAR corridor (laser only)', 'lidar', 'classical ICP odometry'];
+      if (cid === 'kitti_lidar') return ['kitti00', 'KITTI scans (laser only)', 'lidar', 'classical ICP odometry'];
+      const own = cid.startsWith('OWN_'); const rgbd = cid.startsWith('RGBD_');
+      if (own || rgbd) {
+        const key = cid.replace(/^OWN_|^RGBD_/, '');
+        const label = ({ tum_desk: 'TUM desk sweep', tum_office: 'TUM long office (held-out)', tum_desk2: 'TUM wide desk loop', tum_xyz: 'TUM xyz calibration', tum_pioneer: 'TUM robot SLAM run', '7scenes_heads': '7-Scenes heads', '7scenes_stairs': '7-Scenes stairs', icl_living: 'ICL living room (synthetic RGB-D)' } as Record<string, string>)[key] ?? key;
+        return [key, label, 'rgb+depth', rgbd ? 'Track B: sensor RGB-D (metric)' : 'Track A: Estela, RGB-only'];
+      }
+      return [cid, `${cid} (RGB video)`, 'rgb', 'Track A: pointmap SOTA reference'];
+    };
+    const map = new Map<string, SceneDef>();
+    index.cases.forEach((c) => {
+      const [sid, label, inputs, method] = scene(c.case_id);
+      if (!map.has(sid)) map.set(sid, { id: sid, label, inputs, methods: [] });
+      map.get(sid)!.methods.push({ caseId: c.case_id, label: method });
     });
-    return o;
-  }, [index, track]);
-  // keep the selected case inside the active track filter
-  useEffect(() => {
-    const visible = Object.values(byCat).flat();
-    if (visible.length && !visible.includes(sel)) setSel(visible[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byCat]);
+    // Track A first, Track B second, so the method chips read in ladder order
+    map.forEach((s) => s.methods.sort((a, b) => a.label.localeCompare(b.label)));
+    return [...map.values()];
+  }, [index]);
+  const curScene = useMemo(() => SCENES.find((s) => s.methods.some((m) => m.caseId === sel)), [SCENES, sel]);
 
   const thumbs = trace?.depth_thumbs ?? [];
   const rgbThumbs = trace?.rgb_thumbs ?? [];
@@ -99,36 +109,42 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   return (
     <div className="work">
       <aside className="panel">
-        <label className="lab">{es(lang) ? 'Track (familia de modelo)' : 'Track (model family)'}</label>
+        <label className="lab">{es(lang) ? 'Escenario (datos de entrada)' : 'Scenario (input data)'}</label>
+        <select value={curScene?.id ?? ''} onChange={(e) => {
+          const s = SCENES.find((x) => x.id === e.target.value);
+          if (s) setSel(s.methods[0].caseId);
+        }}>
+          {(['rgb+depth', 'rgb', 'lidar', 'synthetic'] as SceneInputs[]).map((inp) => {
+            const group = SCENES.filter((s) => s.inputs === inp);
+            if (!group.length) return null;
+            const glabel = inp === 'rgb+depth' ? (es(lang) ? 'RGB + profundidad (Kinect)' : 'RGB + depth (Kinect)')
+              : inp === 'rgb' ? (es(lang) ? 'Solo RGB (video)' : 'RGB only (video)')
+              : inp === 'lidar' ? (es(lang) ? 'Solo LiDAR (láser, sin cámara)' : 'LiDAR only (laser, no camera)')
+              : (es(lang) ? 'Sintético (control)' : 'Synthetic (control)');
+            return <optgroup key={inp} label={glabel}>{group.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</optgroup>;
+          })}
+        </select>
+
+        <label className="lab">{es(lang) ? 'Método (según los datos del escenario)' : 'Method (what its data supports)'}</label>
         <div className="chips">
-          {([['all', es(lang) ? 'Todos' : 'All'], ['A', 'Track A · RGB'], ['B', 'Track B · RGB-D'], ['sensor', 'LiDAR'], ['control', 'Control']] as [TrackId, string][]).map(([id, lab]) => (
-            <button key={id} className={'chip' + (track === id ? ' on' : '')} onClick={() => setTrack(id)}>{lab}</button>
+          {curScene?.methods.map((m) => (
+            <button key={m.caseId} className={'chip' + (sel === m.caseId ? ' on' : '')} onClick={() => setSel(m.caseId)}>{m.label}</button>
           ))}
         </div>
         <p className="hint">{
-          track === 'A' ? (es(lang)
-            ? 'Solo RGB: una cámara común, sin sensor de profundidad. La escala métrica se INFIERE (el reto duro): Estela (nuestra red, 0.28 m ATE) y la referencia pointmap SOTA.'
-            : 'RGB-only: one ordinary camera, no depth sensor. The metric scale must be INFERRED (the hard problem): Estela (our net, 0.28 m ATE) and the pointmap SOTA reference.')
-          : track === 'B' ? (es(lang)
-            ? 'RGB + profundidad de sensor (Kinect): la escala métrica la MIDE el sensor. Espera trayectorias ~3x más precisas (0.024-0.085 m) y nubes densas con huecos honestos donde el sensor no midió.'
-            : 'RGB + sensor depth (Kinect): the metric scale is MEASURED by the sensor. Expect ~3x tighter trajectories (0.024-0.085 m) and dense clouds with honest holes where the sensor did not measure.')
-          : track === 'sensor' ? (es(lang)
-            ? 'Solo láser (sin cámara): no existe stream RGB; el mapa se colorea por altura y la vista por cuadro muestra el rango del sensor.'
-            : 'Laser only (no camera): no RGB stream exists; the map is height-colored and the per-frame view shows the sensor range.')
-          : track === 'control' ? (es(lang)
+          curScene?.inputs === 'rgb+depth' ? (es(lang)
+            ? 'Este escenario trae RGB y profundidad de sensor: aplica Track A (usa SOLO el RGB; la escala se infiere, 0.28 m clase) o Track B (integra la profundidad Kinect; la escala la mide el sensor, 0.024-0.085 m).'
+            : 'This scenario carries RGB and sensor depth: apply Track A (uses ONLY the RGB; scale is inferred, 0.28 m class) or Track B (integrates the Kinect depth; scale is measured by the sensor, 0.024-0.085 m).')
+          : curScene?.inputs === 'rgb' ? (es(lang)
+            ? 'Este escenario trae solo video RGB: aplica Track A (la escala debe inferirse). Track B no es aplicable sin un sensor de profundidad.'
+            : 'This scenario carries RGB video only: Track A applies (scale must be inferred). Track B is not applicable without a depth sensor.')
+          : curScene?.inputs === 'lidar' ? (es(lang)
+            ? 'Este escenario trae solo barridos láser (no hay cámara): se aplica odometría ICP clásica punto-a-plano sobre los scans; el mapa se colorea por altura. Ningún track (son métodos de cámara).'
+            : 'This scenario carries laser sweeps only (there is no camera): classical point-to-plane ICP odometry runs on the scans; the map is height-colored. Neither track applies (tracks are camera methods).')
+          : (es(lang)
             ? 'Control sintético (CPU, CI): valida el pipeline, no un modelo.'
             : 'Synthetic control (CPU, CI): validates the pipeline, not a model.')
-          : (es(lang)
-            ? 'Dos familias: Track A reconstruye solo desde RGB (la escala se infiere); Track B integra un sensor de profundidad (la escala se mide). Elige un track para saber qué esperar.'
-            : 'Two families: Track A reconstructs from RGB alone (scale is inferred); Track B integrates a depth sensor (scale is measured). Pick a track to know what to expect.')
         }</p>
-
-        <label className="lab">{t(lang, 'source')}</label>
-        <select value={sel} onChange={(e) => setSel(e.target.value)}>
-          {Object.entries(byCat).map(([cat, ids]) => (
-            <optgroup key={cat} label={cat}>{ids.map((id) => <option key={id} value={id}>{id}</option>)}</optgroup>
-          ))}
-        </select>
         <p className="hint">{t(lang, 'replay_note')}</p>
 
         <label className="lab">{es(lang) ? 'Reproducción' : 'Replay'}</label>
