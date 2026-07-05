@@ -3,6 +3,23 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.001] · 2026-07-05
+
+### Added
+- **First-level Track selector in the App** (Felipe's ask: "so I can be sure about what to expect"): chips
+  All / Track A · RGB / Track B · RGB-D / LiDAR / Control filter the case list, each with an expectation hint
+  (Track A: scale is INFERRED, the hard problem, 0.28 m; Track B: scale is MEASURED by the sensor, 0.024-0.085 m
+  with honest holes; LiDAR: laser only, no RGB stream, height-colored map; Control: pipeline validation).
+- Case categories restructured into the explicit two-track taxonomy (track A Estela x8, track A pointmap
+  reference x4, track B Kinect x2, sensor-only LiDAR, control), carried through manifests, index, and bakes.
+- Potree octrees for both RGBD cases (never built) and rebuilt for oxford/university/loop/courthouse/
+  LID_synthetic/SYN_orbit whose octrees predated the re-baked traces.
+
+### Fixed
+- LiDAR cases: the cloud color chip now says "Height" (the baked colors are a height ramp, there is no camera),
+  with an explanatory hint; the depth toggle recolors by camera distance, which looked like a lie when the chip
+  said "RGB".
+
 ## [0.13.000] · 2026-07-05
 
 ### Added
