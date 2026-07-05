@@ -31,11 +31,21 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [showCones, setShowCones] = useState(true);
   const [showTraj, setShowTraj] = useState(true);
   const [showObb, setShowObb] = useState(false); // OBB + RGB axes overlay to compare the coordinate frame across renderers
+  const [track, setTrack] = useState<TrackId>('all'); // FIRST-LEVEL selector: which model track you are looking at
   const raf = useRef(0);
+  const isLidarCase = !!manifest && /lidar/i.test(manifest.category); // laser sensor: baked colors are a height ramp, no camera images exist
 
   useEffect(() => {
     loadIndex().then((ix) => { setIndex(ix); setSel(ix.cases[0]?.case_id ?? ''); }).catch((e) => setErr(String(e)));
   }, []);
+  // FIRST-LEVEL track routing: which model family a case belongs to, derived from its category string
+  type TrackId = 'all' | 'A' | 'B' | 'sensor' | 'control';
+  function trackOf(cat: string): TrackId {
+    if (/track b/i.test(cat)) return 'B';
+    if (/track a/i.test(cat)) return 'A';
+    if (/sensor-only/i.test(cat)) return 'sensor';
+    return 'control';
+  }
   useEffect(() => {
     if (!sel) return;
     setTrace(null); stopPlay(); setReveal(1);
@@ -64,9 +74,18 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
   const byCat = useMemo(() => {
     const o: Record<string, string[]> = {};
-    index?.cases.forEach((c) => (o[c.category] ??= []).push(c.case_id));
+    index?.cases.forEach((c) => {
+      if (track !== 'all' && trackOf(c.category) !== track) return;
+      (o[c.category] ??= []).push(c.case_id);
+    });
     return o;
-  }, [index]);
+  }, [index, track]);
+  // keep the selected case inside the active track filter
+  useEffect(() => {
+    const visible = Object.values(byCat).flat();
+    if (visible.length && !visible.includes(sel)) setSel(visible[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byCat]);
 
   const thumbs = trace?.depth_thumbs ?? [];
   const rgbThumbs = trace?.rgb_thumbs ?? [];
@@ -80,6 +99,30 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   return (
     <div className="work">
       <aside className="panel">
+        <label className="lab">{es(lang) ? 'Track (familia de modelo)' : 'Track (model family)'}</label>
+        <div className="chips">
+          {([['all', es(lang) ? 'Todos' : 'All'], ['A', 'Track A · RGB'], ['B', 'Track B · RGB-D'], ['sensor', 'LiDAR'], ['control', 'Control']] as [TrackId, string][]).map(([id, lab]) => (
+            <button key={id} className={'chip' + (track === id ? ' on' : '')} onClick={() => setTrack(id)}>{lab}</button>
+          ))}
+        </div>
+        <p className="hint">{
+          track === 'A' ? (es(lang)
+            ? 'Solo RGB: una cámara común, sin sensor de profundidad. La escala métrica se INFIERE (el reto duro): Estela (nuestra red, 0.28 m ATE) y la referencia pointmap SOTA.'
+            : 'RGB-only: one ordinary camera, no depth sensor. The metric scale must be INFERRED (the hard problem): Estela (our net, 0.28 m ATE) and the pointmap SOTA reference.')
+          : track === 'B' ? (es(lang)
+            ? 'RGB + profundidad de sensor (Kinect): la escala métrica la MIDE el sensor. Espera trayectorias ~3x más precisas (0.024-0.085 m) y nubes densas con huecos honestos donde el sensor no midió.'
+            : 'RGB + sensor depth (Kinect): the metric scale is MEASURED by the sensor. Expect ~3x tighter trajectories (0.024-0.085 m) and dense clouds with honest holes where the sensor did not measure.')
+          : track === 'sensor' ? (es(lang)
+            ? 'Solo láser (sin cámara): no existe stream RGB; el mapa se colorea por altura y la vista por cuadro muestra el rango del sensor.'
+            : 'Laser only (no camera): no RGB stream exists; the map is height-colored and the per-frame view shows the sensor range.')
+          : track === 'control' ? (es(lang)
+            ? 'Control sintético (CPU, CI): valida el pipeline, no un modelo.'
+            : 'Synthetic control (CPU, CI): validates the pipeline, not a model.')
+          : (es(lang)
+            ? 'Dos familias: Track A reconstruye solo desde RGB (la escala se infiere); Track B integra un sensor de profundidad (la escala se mide). Elige un track para saber qué esperar.'
+            : 'Two families: Track A reconstructs from RGB alone (scale is inferred); Track B integrates a depth sensor (scale is measured). Pick a track to know what to expect.')
+        }</p>
+
         <label className="lab">{t(lang, 'source')}</label>
         <select value={sel} onChange={(e) => setSel(e.target.value)}>
           {Object.entries(byCat).map(([cat, ids]) => (
@@ -124,9 +167,10 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
         <label className="lab">Color</label>
         <div className="chips">
-          <button className={'chip' + (colorMode === 'rgb' ? ' on' : '')} onClick={() => setColorMode('rgb')}>RGB</button>
+          <button className={'chip' + (colorMode === 'rgb' ? ' on' : '')} onClick={() => setColorMode('rgb')}>{isLidarCase ? (es(lang) ? 'Altura' : 'Height') : 'RGB'}</button>
           <button className={'chip' + (colorMode === 'depth' ? ' on' : '')} onClick={() => setColorMode('depth')}>{es(lang) ? 'Profundidad' : 'Depth'}</button>
         </div>
+        {isLidarCase && <p className="hint">{es(lang) ? 'Caso láser: los colores de la nube son una rampa por altura (no hay cámara).' : 'Laser case: the cloud colors are a height ramp (there is no camera).'}</p>}
 
         <label className="lab">{t(lang, 'point_size')}</label>
         <input type="range" min={0.004} max={0.05} step={0.002} value={ptSize} onChange={(e) => setPtSize(+e.target.value)} />
