@@ -5,7 +5,7 @@
 export type ModelRun = {
   id: string;
   run: string;
-  backbone: 'scratch' | 'resnet18';
+  backbone: 'scratch' | 'resnet18' | 'dinov2-vitb' | 'window_pgo' | 'probes' | 'sensor+pgo';
   data: string;
   ate: string;       // metres, or a note
   deployed: 'live' | 'yes-superseded' | 'no' | 'pending';
@@ -70,5 +70,26 @@ export const MODEL_HISTORY: ModelRun[] = [
     ate: '0.61', deployed: 'no',
     notes_en: 'Frozen DINOv2 ViT-B + a DPT-style decoder (the same foundation-backbone family the reference SOTA uses): 89.6 M total but only 3.0 M trainable at 0.65 GB VRAM, proving 8 GB is NOT the constraint. Measured with a new depth metric: depth-AbsRel 0.22 vs the ResNet 0.38 = 42% BETTER DEPTH. But the pose ATE (0.61 m) is worse: the trajectory is capped by the REGRESSION pose head, not the backbone. Post-hoc global bundle adjustment on that pose (M-A) did not clean the map. The honest finding: on modest hardware depth is cheap and pose is the bottleneck; the next lever is a geometric (differentiable-BA) pose, not more capacity.',
     notes_es: 'DINOv2 ViT-B congelado + decoder estilo DPT (la misma familia de backbone fundacional que usa el SOTA de referencia): 89.6 M totales pero solo 3.0 M entrenables a 0.65 GB de VRAM, probando que los 8 GB NO son el límite. Medido con una métrica de depth nueva: depth-AbsRel 0.22 vs 0.38 del ResNet = 42% MEJOR DEPTH. Pero el ATE de pose (0.61 m) es peor: la trayectoria la limita la cabeza de pose de REGRESIÓN, no el backbone. El bundle adjustment global post-hoc sobre esa pose (M-A) no limpió el mapa. El hallazgo honesto: en hardware modesto el depth es barato y la pose es el cuello de botella; el siguiente lever es una pose geométrica (BA diferenciable), no más capacidad.',
+  },
+  {
+    id: 'M-C', run: 'Estela-W: windowed pose-graph (differentiable BA)', backbone: 'window_pgo',
+    data: 'TartanGround + TUM windows (4483)',
+    ate: '3.16 (geo edges)', deployed: 'no',
+    notes_en: 'The differentiable windowed pose-graph (window_pgo): per-edge relative-pose measurements (consecutive + skip) jointly optimized per window. Trained by supervising the measurements directly (back-propagating through the solver goes NaN from a cold start); solver runs forward-only at inference. The fusion works (per-window drift -45% vs chaining the same measurements) but fusing the weak geometric front-end does not beat M8: the front-end is the ceiling, not the fusion. The solver itself found production use in Track B (see the RGBD row).',
+    notes_es: 'El pose-graph por ventanas diferenciable (window_pgo): mediciones de pose relativa por arista (consecutivas + salto) optimizadas conjuntamente por ventana. Entrenado supervisando las mediciones directamente (retropropagar por el solver da NaN desde cero); el solver corre solo-forward en inferencia. La fusión funciona (drift por ventana -45% vs encadenar las mismas mediciones) pero fusionar el front-end geométrico débil no supera a M8: el techo es el front-end, no la fusión. El solver encontró uso productivo en Track B (ver la fila RGBD).',
+  },
+  {
+    id: 'EXP', run: 'refinement + paradigm probes (honest negatives)', backbone: 'probes',
+    data: 'TUM long_office/desk/pioneer',
+    ate: 'raw 0.124 beats all', deployed: 'no',
+    notes_en: 'Three decisive probes. (1) Geometric post-processing WORSENS the deployed trajectory: raw model chain 0.124 m beats ICP 0.39, windowed BA 0.63, global PGO 0.73 on matched frames. (2) The vendored pointmap engine ties Estela in SHAPE under the fair Sim(3) protocol (0.111 vs 0.124 m) but is up-to-scale (~0.11x), confirming metric scale as the blocker, not the paradigm. (3) A metric-depth geometric pose (SIFT+PnP on Depth Anything V2) reaches 0.031-0.034 m with an oracle per-scene scale, ~10x better than deployed, but no monocular signal recovers that scale (jerk and reprojection are degenerate, path-length anchoring is biased): the classical monocular scale ambiguity, measured.',
+    notes_es: 'Tres sondas decisivas. (1) El post-procesamiento geométrico EMPEORA la trayectoria desplegada: la cadena cruda del modelo 0.124 m supera a ICP 0.39, BA por ventanas 0.63, PGO global 0.73 en frames iguales. (2) El motor pointmap vendorizado empata con Estela en FORMA bajo el protocolo justo Sim(3) (0.111 vs 0.124 m) pero sale sin escala (~0.11x), confirmando la escala métrica como el bloqueador, no el paradigma. (3) Una pose geométrica con depth métrico (SIFT+PnP sobre Depth Anything V2) llega a 0.031-0.034 m con escala oráculo por escena, ~10x mejor que lo desplegado, pero ninguna señal monocular recupera esa escala (jerk y reproyección son degeneradas, el anclaje por longitud de camino está sesgado): la ambigüedad de escala monocular clásica, medida.',
+  },
+  {
+    id: 'RGBD', run: 'Track B: RGB + sensor depth (LIVE)', backbone: 'sensor+pgo',
+    data: 'TUM RGB-D (Kinect depth stream)',
+    ate: '0.024-0.085', deployed: 'live',
+    notes_en: 'The two-track family goes live: SIFT + PnP on the real Kinect depth (metric BY CONSTRUCTION, the scale blocker disappears at the source) + the M-C windowed pose-graph fusing the strong metric edges (a further 7-26% drift cut; its first production use). Office 0.085 m, desk 0.034, pioneer 0.024 vs 0.28 m RGB-only. Cases RGBD_tum_office/desk mirror the RGB-only OWN_* scenes for an honest side-by-side. Sensor holes stay holes; nothing is hallucinated.',
+    notes_es: 'La familia de dos tracks entra en producción: SIFT + PnP sobre la profundidad Kinect real (métrica POR CONSTRUCCIÓN, el bloqueador de escala desaparece en el origen) + el pose-graph por ventanas M-C fusionando las aristas métricas fuertes (un recorte adicional de drift de 7-26%; su primer uso productivo). Office 0.085 m, desk 0.034, pioneer 0.024 vs 0.28 m RGB-only. Los casos RGBD_tum_office/desk espejan las escenas RGB-only OWN_* para una comparación honesta lado a lado. Los huecos del sensor quedan como huecos; nada se alucina.',
   },
 ];

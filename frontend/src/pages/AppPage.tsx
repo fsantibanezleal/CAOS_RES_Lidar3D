@@ -163,6 +163,11 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
             ? <><img className="depth" src={show.png_b64} alt="per-frame view" /><p className="hint">{(rightTab === 'rgb' && rgbT) ? 'RGB' : (es(lang) ? 'Profundidad' : 'Depth')} · {es(lang) ? 'cuadro' : 'frame'} {show.idx}/{trace!.n_frames}</p></>
             : <p className="hint">{es(lang) ? 'sin vista para este caso' : 'no view for this case'}</p>;
         })()}
+        {!rgbT && manifest && /lidar/i.test(manifest.category) && (
+          <p className="hint">{es(lang)
+            ? 'Caso LiDAR: el sensor es un láser, no hay stream RGB (el mapa se colorea por altura).'
+            : 'LiDAR case: the sensor is a laser, there is no RGB stream (the map is height-colored).'}</p>
+        )}
 
         {manifest && (
           <>

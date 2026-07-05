@@ -135,6 +135,15 @@ evaluated on the held-out TUM `long_office` (the same sequence the deployed per-
 a much larger extent, so absolute ATE is dominated by scale and accumulation. The per-window drift, not the raw
 ATE, is the fair cross-sequence read of the fusion gain.)
 
+## Production use: Track B fuses with window_pgo
+
+The solver found its production home in [Track B](06_rgbd-track-b.md) (the `rgbd-sensor` engine): the RGB-D
+SIFT+PnP edges are strong AND metric, exactly the regime where the fusion pays. Overlapping 6-frame windows
+(consecutive + skip-2 edges, per-edge weight = the PnP RANSAC inlier count) cut ATE a further 7 to 26% below the
+already-strong sensor chain (office 0.097 to 0.085, desk 0.036 to 0.034, pioneer 0.033 to 0.024 m). Together with
+the P0.1 negative (the same fusion FAILS over weak monocular edges), this completes the honest picture of the M-C
+mechanism: windowed pose-graph fusion is a multiplier on edge quality, not a substitute for it.
+
 ## How to run
 
 ```bash

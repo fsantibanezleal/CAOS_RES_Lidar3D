@@ -72,6 +72,8 @@ def precompute(case_id: str, seed: int = 42) -> dict:
 
     if spec.engine == "own-depthpose":
         model = _own_model_label()
+    elif spec.engine == "rgbd-sensor":
+        model = "RGB-D sensor geometry (SIFT + PnP on Kinect depth; metric by construction)"
     elif spec.modality == "lidar":
         model = "open3d point-to-plane ICP" + (" (synthetic scans)" if spec.synthetic else " (real LiDAR scans)")
     elif spec.synthetic:
@@ -79,7 +81,8 @@ def precompute(case_id: str, seed: int = 42) -> dict:
     else:
         model = "lingbot-map (arXiv:2604.14141)"
     engine = {"package": "lidar3dlab", "version": __version__, "model": model,
-              "pretrained": (spec.engine == "own-depthpose") or (spec.modality == "camera" and not spec.synthetic)}
+              "pretrained": (spec.engine == "own-depthpose") or
+                            (spec.engine != "rgbd-sensor" and spec.modality == "camera" and not spec.synthetic)}
     return export.run(case=case, params=spec, result=result, refine_info=refine_info, seed=seed,
                       run_ms=run_ms, flags=rep.flagged, metrics=metrics, engine=engine,
                       derived_dir=str(DERIVED), manifests_dir=str(MANIFESTS))
