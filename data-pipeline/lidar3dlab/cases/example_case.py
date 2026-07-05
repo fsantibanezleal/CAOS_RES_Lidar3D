@@ -44,7 +44,7 @@ def _own(cid: str, subpath: str, expected: str, dataset: str, license: str, intr
     under DATA_ROOT/train/. `frames` = (larger) coverage cap; `glob` selects the RGB frames when the folder mixes
     files ("*.color.png" for 7-Scenes); `intr` = real intrinsics for a correct cloud; `max_depth` drops far points
     (which amplify pose error into scatter) so the accumulated cloud stays sharp."""
-    return Case(cid, "ours: trained depth+pose model",
+    return Case(cid, "track A: RGB-only, Estela (ours)",
                 SequenceSpec(cid, source_dir=str(DATA_ROOT / "train" / subpath), n_frames=0, max_frames=frames,
                              decimation=2, conf_quantile=0.65, engine="own-depthpose", frame_glob=glob,
                              intrinsics=intr, max_render_depth=max_depth),
@@ -52,11 +52,11 @@ def _own(cid: str, subpath: str, expected: str, dataset: str, license: str, intr
 
 
 CASES: list[Case] = [
-    Case("SYN_orbit", "synthetic: camera, procedural corridor (CPU, CI)",
+    Case("SYN_orbit", "control: synthetic camera (CPU, CI)",
          SequenceSpec("SYN_orbit", source_dir="synthetic://corridor", n_frames=120, max_frames=120,
                       decimation=4, synthetic=True),
          "forward tunnel; colored/textured walls; ~5 m path; runs on CPU in <1 s", "synthetic"),
-    Case("LID_synthetic", "synthetic: LiDAR ICP odometry (CPU, CI)",
+    Case("LID_synthetic", "sensor-only: LiDAR ICP odometry (no camera)",
          SequenceSpec("LID_synthetic", source_dir="synthetic://lidar", n_frames=90, max_frames=90,
                       synthetic=True, modality="lidar"),
          "forward LiDAR sweep down a corridor; point-to-plane ICP odometry recovers a ~9 m path; height-colored map",
@@ -85,21 +85,21 @@ CASES: list[Case] = [
     _own("OWN_icl_living", "icl-nuim/rgb",
          "Estela on ICL-NUIM synthetic living-room (perfect-depth synthetic domain, IN the training set via --use_icl): a clean best-case sharpness reference, not held-out",
          "ICL-NUIM (living_room, Handa et al. 2014)", "ICL-NUIM (research use)", _ICL, max_depth=6.0),
-    Case("kitti_lidar", "real: LiDAR odometry (KITTI-style scans)",
+    Case("kitti_lidar", "sensor-only: LiDAR ICP odometry (no camera)",
          SequenceSpec("kitti_lidar", source_dir=str(DATA_ROOT / "lidar" / "kitti00"), n_frames=0, max_frames=40,
                       modality="lidar"),
          "a folder of .bin/.npy/.ply LiDAR scans; ICP odometry + registered map (bakes offline when the dataset is present)",
          "real", dataset="KITTI odometry (Geiger et al. 2012)", license="CC BY-NC-SA 3.0 (KITTI)"),
-    Case("oxford", "real: outdoor walk",
+    Case("oxford", "track A: RGB-only, pointmap SOTA reference",
          _real("oxford"), "forward outdoor street; smooth metric trajectory (a few metres)", "real",
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
-    Case("university", "real: courtyard",
+    Case("university", "track A: RGB-only, pointmap SOTA reference",
          _real("university"), "courtyard walk; metric trajectory; structured facades", "real",
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
-    Case("loop", "real: revisit (loop closure)",
+    Case("loop", "track A: RGB-only, pointmap SOTA reference",
          _real("loop"), "path that revisits; showcases the drift / loop-closure gap", "real",
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
-    Case("courthouse", "real: facade orbit",
+    Case("courthouse", "track A: RGB-only, pointmap SOTA reference",
          _real("courthouse"), "facade orbit; metric trajectory around a structure", "real",
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
     # ---- Track B: RGB + REAL SENSOR DEPTH (rgbd-sensor engine). The RGB-only cases above are Track A; these

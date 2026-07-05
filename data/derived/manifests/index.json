@@ -5,47 +5,47 @@
   "cases": [
     {
       "case_id": "LID_synthetic",
-      "category": "synthetic: LiDAR ICP odometry (CPU, CI)",
+      "category": "sensor-only: LiDAR ICP odometry (no camera)",
       "manifest_path": "manifests/LID_synthetic.json"
     },
     {
       "case_id": "OWN_7scenes_heads",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_7scenes_heads.json"
     },
     {
       "case_id": "OWN_7scenes_stairs",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_7scenes_stairs.json"
     },
     {
       "case_id": "OWN_icl_living",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_icl_living.json"
     },
     {
       "case_id": "OWN_tum_desk",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_tum_desk.json"
     },
     {
       "case_id": "OWN_tum_desk2",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_tum_desk2.json"
     },
     {
       "case_id": "OWN_tum_office",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_tum_office.json"
     },
     {
       "case_id": "OWN_tum_pioneer",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_tum_pioneer.json"
     },
     {
       "case_id": "OWN_tum_xyz",
-      "category": "ours: trained depth+pose model",
+      "category": "track A: RGB-only, Estela (ours)",
       "manifest_path": "manifests/OWN_tum_xyz.json"
     },
     {
@@ -60,27 +60,27 @@
     },
     {
       "case_id": "SYN_orbit",
-      "category": "synthetic: camera, procedural corridor (CPU, CI)",
+      "category": "control: synthetic camera (CPU, CI)",
       "manifest_path": "manifests/SYN_orbit.json"
     },
     {
       "case_id": "courthouse",
-      "category": "real: facade orbit",
+      "category": "track A: RGB-only, pointmap SOTA reference",
       "manifest_path": "manifests/courthouse.json"
     },
     {
       "case_id": "loop",
-      "category": "real: revisit (loop closure)",
+      "category": "track A: RGB-only, pointmap SOTA reference",
       "manifest_path": "manifests/loop.json"
     },
     {
       "case_id": "oxford",
-      "category": "real: outdoor walk",
+      "category": "track A: RGB-only, pointmap SOTA reference",
       "manifest_path": "manifests/oxford.json"
     },
     {
       "case_id": "university",
-      "category": "real: courtyard",
+      "category": "track A: RGB-only, pointmap SOTA reference",
       "manifest_path": "manifests/university.json"
     }
   ]
