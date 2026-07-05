@@ -1,7 +1,7 @@
 {
   "schema": "lidar3d.index/v1",
-  "engine_version": "0.12.000",
-  "n_cases": 14,
+  "engine_version": "0.12.003",
+  "n_cases": 16,
   "cases": [
     {
       "case_id": "LID_synthetic",
@@ -47,6 +47,16 @@
       "case_id": "OWN_tum_xyz",
       "category": "ours: trained depth+pose model",
       "manifest_path": "manifests/OWN_tum_xyz.json"
+    },
+    {
+      "case_id": "RGBD_tum_desk",
+      "category": "track B: RGB + sensor depth (Kinect)",
+      "manifest_path": "manifests/RGBD_tum_desk.json"
+    },
+    {
+      "case_id": "RGBD_tum_office",
+      "category": "track B: RGB + sensor depth (Kinect)",
+      "manifest_path": "manifests/RGBD_tum_office.json"
     },
     {
       "case_id": "SYN_orbit",

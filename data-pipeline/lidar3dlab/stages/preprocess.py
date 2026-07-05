@@ -14,6 +14,8 @@ def run(spec: SequenceSpec) -> dict:
     if spec.synthetic:
         return {"frames": [], "synthetic": True}
     paths = sorted(sum([glob.glob(os.path.join(spec.source_dir, f"*{e}")) for e in _EXTS], []))[:spec.max_frames]
+    if not paths:  # an RGB-D sequence ROOT (TUM layout) keeps its frames in rgb/; the engine associates depth/
+        paths = sorted(sum([glob.glob(os.path.join(spec.source_dir, "rgb", f"*{e}")) for e in _EXTS], []))[:spec.max_frames]
     if not paths:
         raise FileNotFoundError(f"no frames in {spec.source_dir}")
     return {"frames": paths, "synthetic": False}
