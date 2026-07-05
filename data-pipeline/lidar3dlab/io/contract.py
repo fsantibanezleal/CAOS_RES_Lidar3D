@@ -44,9 +44,10 @@ class ContractReport:
 
 
 def count_frames(source_dir: str) -> int:
-    n = len(sum([glob.glob(os.path.join(source_dir, f"*{e}")) for e in IMAGE_EXTS], []))
+    # dedupe: on case-insensitive filesystems (Windows) "*.png" and "*.PNG" match the SAME files
+    n = len({p for e in IMAGE_EXTS for p in glob.glob(os.path.join(source_dir, f"*{e}"))})
     if n == 0:  # an RGB-D sequence ROOT (TUM layout: rgb/ + depth/ + *.txt) keeps its frames in rgb/
-        n = len(sum([glob.glob(os.path.join(source_dir, "rgb", f"*{e}")) for e in IMAGE_EXTS], []))
+        n = len({p for e in IMAGE_EXTS for p in glob.glob(os.path.join(source_dir, "rgb", f"*{e}"))})
     return n
 
 
