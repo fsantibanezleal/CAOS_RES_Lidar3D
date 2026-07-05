@@ -102,4 +102,25 @@ CASES: list[Case] = [
     Case("courthouse", "real: facade orbit",
          _real("courthouse"), "facade orbit; metric trajectory around a structure", "real",
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
+    # ---- Track B: RGB + REAL SENSOR DEPTH (rgbd-sensor engine). The RGB-only cases above are Track A; these
+    # integrate the Kinect depth stream, so the metric scale comes from the SENSOR (no monocular ambiguity) and the
+    # trajectory is ~3x tighter than the RGB-only Estela on the same scenes (0.034-0.098 m validated vs 0.03-0.28).
+    # Same scenes as OWN_tum_office/desk so the site shows an honest side-by-side of what the depth sensor buys. ----
+    Case("RGBD_tum_office", "track B: RGB + sensor depth (Kinect)",
+         SequenceSpec("RGBD_tum_office",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg3_long_office_household"),
+                      n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
+                      intrinsics=_TUM3, max_render_depth=6.0),
+         "the SAME office sweep as OWN_tum_office, but integrating the real Kinect depth: SIFT+PnP geometric pose "
+         "on sensor depth (metric by construction, 0.098 m ATE vs 0.28 m RGB-only), sensor holes stay honest holes",
+         "real", dataset="TUM RGB-D (freiburg3_long_office_household, Sturm et al. 2012)",
+         license="CC BY 4.0 (TUM RGB-D)"),
+    Case("RGBD_tum_desk", "track B: RGB + sensor depth (Kinect)",
+         SequenceSpec("RGBD_tum_desk",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk"),
+                      n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
+                      intrinsics=_TUM1, max_render_depth=5.0),
+         "the SAME desk sweep as OWN_tum_desk with the real Kinect depth integrated: 0.037 m ATE (vs 0.119 m "
+         "RGB-only), the cleanest demonstration of what a depth sensor buys",
+         "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
 ]

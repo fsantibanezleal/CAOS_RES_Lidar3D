@@ -44,7 +44,10 @@ class ContractReport:
 
 
 def count_frames(source_dir: str) -> int:
-    return len(sum([glob.glob(os.path.join(source_dir, f"*{e}")) for e in IMAGE_EXTS], []))
+    n = len(sum([glob.glob(os.path.join(source_dir, f"*{e}")) for e in IMAGE_EXTS], []))
+    if n == 0:  # an RGB-D sequence ROOT (TUM layout: rgb/ + depth/ + *.txt) keeps its frames in rgb/
+        n = len(sum([glob.glob(os.path.join(source_dir, "rgb", f"*{e}")) for e in IMAGE_EXTS], []))
+    return n
 
 
 def validate_rows(raw_rows: list[dict[str, Any]]) -> ContractReport:
