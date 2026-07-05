@@ -147,6 +147,25 @@ CASES: list[Case] = [
          "the SAME robot SLAM run as OWN_tum_pioneer with the Kinect depth integrated: Track B on the hardest "
          "drift test (0.024 m validated vs 0.031 m RGB-only)",
          "real", dataset="TUM RGB-D (freiburg2_pioneer_slam, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    # ---- classical depth-only method on the SAME RGB-D scenarios: point-to-plane ICP on the sensor depth (no RGB
+    # in the pose estimation; RGB colors the display only). The same registration the LiDAR-only scenario runs,
+    # applied to Kinect depth, so every depth-capable scenario compares Track A vs Track B vs classical ICP. ----
+    Case("DICP_tum_desk", "classical: depth-only ICP (no RGB in the pose)",
+         SequenceSpec("DICP_tum_desk",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk"),
+                      n_frames=0, max_frames=240, decimation=2, engine="depth-icp",
+                      intrinsics=_TUM1, max_render_depth=5.0),
+         "the SAME desk sweep, pose from the Kinect depth ALONE (point-to-plane ICP frame to frame): the classical "
+         "baseline both tracks are compared against",
+         "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
+    Case("DICP_tum_office", "classical: depth-only ICP (no RGB in the pose)",
+         SequenceSpec("DICP_tum_office",
+                      source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg3_long_office_household"),
+                      n_frames=0, max_frames=240, decimation=2, engine="depth-icp",
+                      intrinsics=_TUM3, max_render_depth=6.0),
+         "the SAME office sweep, pose from the Kinect depth ALONE (point-to-plane ICP): the classical baseline",
+         "real", dataset="TUM RGB-D (freiburg3_long_office_household, Sturm et al. 2012)",
+         license="CC BY 4.0 (TUM RGB-D)"),
 ]
 
 # ---- scenario model: a SCENARIO is the input data (a scene captured with specific sensors); a METHOD is what we

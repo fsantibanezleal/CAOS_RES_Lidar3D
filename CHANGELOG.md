@@ -3,6 +3,18 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.003] · 2026-07-05
+
+### Added
+- **Classical depth-only method on RGB-D scenarios** (Felipe: "apply the classic method too, so we can compare
+  all outcomes"): new `depth-icp` engine, frame-to-frame point-to-plane ICP on the SENSOR depth alone (no RGB in
+  the pose estimation; RGB colors the display only), the same registration the LiDAR-only scenario runs. Cases
+  DICP_tum_desk + DICP_tum_office (+ octrees), so the desk and office scenarios now offer the full method matrix:
+  Track A (RGB-only, learned) / Track B (RGB + depth, geometric) / classical depth-only ICP (baseline).
+- Honest measured comparison on the same frames: desk = Track B 0.034 m beats depth-ICP 0.063; office =
+  depth-ICP 0.041 m beats Track B 0.085 (dense ICP absorbs Kinect noise at range better than sparse PnP
+  back-projection). Neither dominates; the matrix shows real tradeoffs, not a rigged ladder.
+
 ## [0.13.002] · 2026-07-05
 
 ### Changed

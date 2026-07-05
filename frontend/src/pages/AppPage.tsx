@@ -77,11 +77,11 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
       if (cid === 'SYN_orbit') return ['syn_corridor', 'Synthetic corridor (control)', 'synthetic', 'synthetic control (CPU)'];
       if (cid === 'LID_synthetic') return ['lidar_corridor', 'LiDAR corridor (laser only)', 'lidar', 'classical ICP odometry'];
       if (cid === 'kitti_lidar') return ['kitti00', 'KITTI scans (laser only)', 'lidar', 'classical ICP odometry'];
-      const own = cid.startsWith('OWN_'); const rgbd = cid.startsWith('RGBD_');
-      if (own || rgbd) {
-        const key = cid.replace(/^OWN_|^RGBD_/, '');
+      const own = cid.startsWith('OWN_'); const rgbd = cid.startsWith('RGBD_'); const dicp = cid.startsWith('DICP_');
+      if (own || rgbd || dicp) {
+        const key = cid.replace(/^OWN_|^RGBD_|^DICP_/, '');
         const label = ({ tum_desk: 'TUM desk sweep', tum_office: 'TUM long office (held-out)', tum_desk2: 'TUM wide desk loop', tum_xyz: 'TUM xyz calibration', tum_pioneer: 'TUM robot SLAM run', '7scenes_heads': '7-Scenes heads', '7scenes_stairs': '7-Scenes stairs', icl_living: 'ICL living room (synthetic RGB-D)' } as Record<string, string>)[key] ?? key;
-        return [key, label, 'rgb+depth', rgbd ? 'Track B: sensor RGB-D (metric)' : 'Track A: Estela, RGB-only'];
+        return [key, label, 'rgb+depth', dicp ? 'classical: depth-only ICP' : rgbd ? 'Track B: sensor RGB-D (metric)' : 'Track A: Estela, RGB-only'];
       }
       return [cid, `${cid} (RGB video)`, 'rgb', 'Track A: pointmap SOTA reference'];
     };
@@ -133,8 +133,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         </div>
         <p className="hint">{
           curScene?.inputs === 'rgb+depth' ? (es(lang)
-            ? 'Este escenario trae RGB y profundidad de sensor: aplica Track A (usa SOLO el RGB; la escala se infiere, 0.28 m clase) o Track B (integra la profundidad Kinect; la escala la mide el sensor, 0.024-0.085 m).'
-            : 'This scenario carries RGB and sensor depth: apply Track A (uses ONLY the RGB; scale is inferred, 0.28 m class) or Track B (integrates the Kinect depth; scale is measured by the sensor, 0.024-0.085 m).')
+            ? 'Este escenario trae RGB y profundidad de sensor: aplica Track A (usa SOLO el RGB; la escala se infiere, 0.28 m clase), Track B (RGB + profundidad Kinect; la escala la mide el sensor, 0.024-0.085 m), o el ICP clásico solo-profundidad (sin RGB en la pose; la línea base con la que ambos tracks se comparan).'
+            : 'This scenario carries RGB and sensor depth: apply Track A (uses ONLY the RGB; scale is inferred, 0.28 m class), Track B (RGB + Kinect depth; scale is measured by the sensor, 0.024-0.085 m), or classical depth-only ICP (no RGB in the pose; the baseline both tracks are compared against).')
           : curScene?.inputs === 'rgb' ? (es(lang)
             ? 'Este escenario trae solo video RGB: aplica Track A (la escala debe inferirse). Track B no es aplicable sin un sensor de profundidad.'
             : 'This scenario carries RGB video only: Track A applies (scale must be inferred). Track B is not applicable without a depth sensor.')
