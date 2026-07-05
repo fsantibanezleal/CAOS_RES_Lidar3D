@@ -84,17 +84,26 @@ effort goes to a stronger learned front-end (better pose/depth/matching) or the 
 (2) the shipped ICP-for-bake improves LOCAL cloud consistency but worsens GLOBAL ATE, a real tradeoff, so flipping
 the bake default to raw is a cloud-quality-vs-ATE judgment that needs a visual check, not an automatic flip.
 
-**Pointmap-paradigm probe (2026-07-04): the vendored lingbot does NOT beat Estela.** To test whether a pointmap
-model (which predicts geometry + pose jointly and sidesteps the per-pair ceiling) wins on our indoor scenes, we ran
-the vendored `lingbot` engine (VGGT-style GCTStream, ~7 GB, 4.6 GB checkpoint) on `long_office` and measured its
-ATE directly (it predicts poses). On the matched first 150 frames: **lingbot 0.350 m vs Estela raw 0.124 m**, so
-Estela is about 3x better on trajectory. Its cloud is denser (597 k points vs Estela ~85 k) but diffuse and
-scale-compressed (bbox ~1.5 m for a ~5 m room), not obviously cleaner. So the one VGGT-class model we have loses
-on both ATE and cloud coherence. The literature's stronger pointmap-SLAM (MASt3R-SLAM, ~0.04-0.06 m indoor) is
-research-only license and would need the offline lane; the general lingbot is not fine-tuned on TUM, while Estela
-is. Honest conclusion from these two probes: the 0.28 m ceiling is robust, neither geometric post-processing nor
-the available pointmap model beats it, so breaking it needs a stronger LEARNED front-end (better depth + matcher,
-re-trained pose), not a cheap swap.
+**Pointmap-paradigm probe (2026-07-04, CORRECTED): lingbot ties Estela up to scale; the gap is METRIC SCALE, not
+shape.** To test whether a pointmap model (which predicts geometry + pose jointly and sidesteps the per-pair
+ceiling) wins on our indoor scenes, we ran the vendored `lingbot` engine (VGGT-style GCTStream, ~7 GB, 4.6 GB
+checkpoint) on `long_office` (matched first 150 frames) and measured trajectory ATE (it predicts poses).
+
+- **First report (flawed):** rigid-only Umeyama gave lingbot 0.350 m vs Estela raw 0.124 m, and we concluded
+  Estela was 3x better. But lingbot's output is monocular up-to-scale (its trajectory came out at ~0.11x metric
+  scale; the cloud bbox read ~1.5 m for a ~5 m room), and rigid-only alignment destroys a shape-correct
+  wrong-scale trajectory. The standard monocular protocol is Sim(3) (scale + rigid).
+- **Corrected, Sim(3):** lingbot **0.111 m** (recovered scale 8.8x) vs Estela raw 0.124 m (metric; Sim(3) does not
+  change it materially). So the general-purpose lingbot, NOT fine-tuned on TUM, matches our TUM-trained model's
+  trajectory SHAPE out of the box, with drift-free streaming over its fixed three-tier memory. What it lacks is
+  the absolute METRIC scale, the exact same blocker as the DA-V2 geometric-pose path (the P1 scale finding).
+- The cloud remains diffuse at the per-point level vs Estela's conf-filtered cloud, and per-scene metric scale is
+  still required for a deployable bake (our product renders metric scenes), so the practical conclusions stand:
+  Estela stays deployed, and SCALE is the single blocker across every path.
+
+Honest conclusion from the two probes (revised): the 0.28 m per-pair ceiling is not broken by geometric
+post-processing; the pointmap engine already matches Estela in shape and would likely beat it with a metric-scale
+anchor. Everything now converges on ONE problem: per-scene monocular metric scale.
 
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
