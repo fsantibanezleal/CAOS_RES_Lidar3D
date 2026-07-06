@@ -109,8 +109,24 @@ export function DeckViewer({ trace, pointSize, dark, density, reveal, colorMode,
     const zoom = Math.log2(240 / d.radius);
     if (cameraMode === 'top') return { target: d.center, rotationOrbit: 0, rotationX: 89, zoom, minZoom: -6, maxZoom: 24 };
     if (cameraMode === 'first') {
+      // TRUE sensor POV: eye at the frame's camera center, looking along its real forward axis. OrbitView places
+      // the eye at `target + dist * dir(rotation)`, so set target = a point ahead along the heading, and derive the
+      // rotation from the BACKWARD direction (-forward): rotationX = elevation, rotationOrbit = -azimuth (deck's
+      // orbit sense is negated vs three.js, see the orbit comment below). zoom picks dist ~ the look-ahead length,
+      // which puts the eye at the sensor center.
       const f = Math.min(d.centers.length - 1, Math.round(Math.max(0, Math.min(1, reveal)) * (d.centers.length - 1)));
-      return { target: d.centers[f] || d.center, rotationOrbit: -25, rotationX: 14, zoom: Math.log2(240 / (d.radius * 0.3)), minZoom: -6, maxZoom: 26 };
+      const eye = d.centers[f] || d.center;
+      const fw = d.fwds[f] || [0, 0, 1];
+      const L = Math.max(d.radius * 0.5, 0.5);
+      const target = [eye[0] + fw[0] * L, eye[1] + fw[1] * L, eye[2] + fw[2] * L];
+      const bx = -fw[0], by = -fw[1], bz = -fw[2];                     // unit backward (target -> eye)
+      const rotationX = Math.asin(Math.max(-1, Math.min(1, by))) * 180 / Math.PI;
+      const rotationOrbit = -Math.atan2(bx, bz) * 180 / Math.PI;
+      // OrbitView eye distance = (h/2) / (tan(fovy/2) * 2^zoom); solve zoom so the distance equals L, which puts
+      // the eye exactly AT the sensor center (uses the real canvas height, not a constant).
+      const h = wrapRef.current?.clientHeight || 800;
+      const zoomFP = Math.log2((h / 2) / (Math.tan((55 / 2) * Math.PI / 180) * L));
+      return { target, rotationOrbit, rotationX, zoom: zoomFP, minZoom: -6, maxZoom: 26 };
     }
     // rotationOrbit is negated vs three.js's azimuth (deck's orbit convention is the opposite sense): three.js
     // frames from (0.5,0.45,1) ~ +26.6deg azimuth / +22deg elevation, so deck uses -27 / 22 to look the SAME way.

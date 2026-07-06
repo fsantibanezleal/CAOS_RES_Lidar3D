@@ -175,9 +175,11 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     const r = Math.max(bb.getSize(new THREE.Vector3()).length() * 0.55, 0.5);
     const frame = d ? Math.min(a.centers.length - 1, Math.round(Math.max(0, Math.min(1, reveal)) * (a.centers.length - 1))) : 0;
     if (cameraMode === 'first') {
+      // TRUE sensor POV: the eye sits AT the camera center of the current frame and looks along the camera's
+      // real forward axis (what the sensor saw), not a chase-cam behind it (Felipe 2026-07-05).
       const pos = a.centers[frame].clone(); const fwd = a.fwds[frame] || new THREE.Vector3(0, 0, 1);
-      a.controls.target.copy(pos);                                    // CENTER on the last measured point
-      a.camera.position.copy(pos.clone().addScaledVector(fwd, -r * 0.28)); // just behind the sensor, looking at it
+      a.camera.position.copy(pos);
+      a.controls.target.copy(pos.clone().addScaledVector(fwd, Math.max(r * 0.5, 0.5))); // look ahead along the heading
       a.controls.minDistance = 0.01; a.controls.maxDistance = r * 6;
     } else if (cameraMode === 'top') {
       a.controls.target.copy(c);

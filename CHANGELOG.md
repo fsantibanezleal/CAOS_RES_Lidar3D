@@ -3,6 +3,17 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.005] · 2026-07-05
+
+### Fixed
+- **First-person camera is now the TRUE sensor point of view in every renderer** (Felipe: deck.gl and surfels
+  did not keep the real POV). three.js/surfels placed the eye BEHIND the sensor looking at it (a chase-cam);
+  now the eye sits AT the frame's camera center looking along its real forward axis. deck.gl orbited a target
+  from a fixed angle; now the OrbitView rotation is derived from the camera's actual heading (elevation +
+  azimuth from the backward vector, deck's negated orbit sense handled) and the zoom solves the eye distance
+  from the canvas height so the eye lands exactly at the sensor center. Potree already used the true POV; all
+  four renderers now agree.
+
 ## [0.13.004] · 2026-07-05
 
 ### Changed
