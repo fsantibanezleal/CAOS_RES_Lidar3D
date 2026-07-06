@@ -3,6 +3,17 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.008] · 2026-07-06
+
+### Fixed
+- **RGB-video scenarios reconstructed backwards (#77).** The lingbot engine inverted the decoded pose encoding,
+  treating camera-to-world extrinsics as world-to-camera; the camera faced opposite to the walking direction and
+  the trajectory was jagged and inflated. Measured on the oxford walk: cos(forward, motion) -0.48 and a 13.9 m
+  path before; +0.79 and a smooth 5.5 m path after using the decoded matrices directly. oxford / university /
+  loop / courthouse re-baked (+ octrees): forward alignment now +0.79 / +0.86 / +0.89 (courthouse ~0 as expected,
+  the camera orbits a facade sideways). First-person verified in-app: the camera looks down the street in the
+  walking direction.
+
 ## [0.13.007] · 2026-07-06
 
 ### Added
