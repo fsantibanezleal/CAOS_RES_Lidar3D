@@ -3,6 +3,27 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.006] · 2026-07-06
+
+### Added
+- The 3-method matrix on ALL 5 TUM scenarios: DICP_tum_desk2 / _xyz / _pioneer baked (+ octrees), 24 cases.
+- The measured matrix (240 frames, umeyama rigid ATE, metres):
+  desk A 0.137 / B 0.041 / ICP 0.063 · office A 0.198 / B 0.077 / ICP 0.041 · desk2 A 0.119 / B 0.016 / ICP 0.075
+  · xyz A 0.184 / B 0.025 / ICP 0.020 · pioneer A 0.115 / B 0.039 / ICP 0.128. Track B wins 3/5, depth-ICP 2/5,
+  honest per-scenario tradeoffs preserved.
+
+### Changed
+- App defaults (Felipe 2026-07-06): point density FULL, point size at a THIRD of the slider range, RGB color
+  for every case (LiDAR shows its height ramp under the Height label), and the default method per scenario is
+  Track B when available, else Track A, else the remaining method (applies on page load and scenario change);
+  surfels is the default renderer.
+
+### Fixed
+- Surfels blank on a cold production mount: a late layout pass could clear the drawing buffer after the last
+  render; a bounded 3 s warm-up repaint window after data load fixes the first paint (render-on-demand after,
+  self-terminating). The disc sprite is also built per WebGL context instead of module-cached (a cached texture
+  could hold a handle from a disposed context).
+
 ## [0.13.005] · 2026-07-05
 
 ### Fixed

@@ -9,10 +9,9 @@ import { CloudViewer, type CameraMode, type ColorMode } from '../render/CloudVie
 import { DeckViewer } from '../render/DeckViewer';
 import { PotreeViewer } from '../render/PotreeViewer';
 
-const DETAIL_STRIDE = [8, 4, 3, 2, 1]; // point-density level 1(low)..5(full) -> draw-stride (start LOW for fluidity)
+const DETAIL_STRIDE = [8, 4, 3, 2, 1]; // point-density level 1(low)..5(full) -> draw-stride
 const es = (l: Lang) => l === 'es';
-const defaultColor = (m: CaseManifest): ColorMode =>
-  /lidar|icp|open3d/i.test(`${m.category} ${m.engine?.model ?? ''}`) ? 'depth' : 'rgb';
+const defaultColor = (_m: CaseManifest): ColorMode => 'rgb'; // RGB default for every case (Felipe 2026-07-06); LiDAR shows its height ramp under the Height label
 
 export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [index, setIndex] = useState<CaseIndex | null>(null);
@@ -20,13 +19,13 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [manifest, setManifest] = useState<CaseManifest | null>(null);
   const [trace, setTrace] = useState<Trace | null>(null);
   const [err, setErr] = useState('');
-  const [ptSize, setPtSize] = useState(0.016);
-  const [detail, setDetail] = useState(1);
+  const [ptSize, setPtSize] = useState(0.02); // a third of the slider range by default (Felipe 2026-07-06)
+  const [detail, setDetail] = useState(5); // FULL density by default (Felipe 2026-07-06)
   const [reveal, setReveal] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>('rgb');
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
-  const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels' | 'potree'>('three');
+  const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels' | 'potree'>('surfels'); // surfels default (Felipe 2026-07-06)
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
   const [showCones, setShowCones] = useState(false); // overlays OFF by default: land on the clean full scene (Felipe 2026-07-05)
   const [showTraj, setShowTraj] = useState(true);
@@ -35,7 +34,11 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const isLidarCase = !!manifest && /lidar/i.test(manifest.category); // laser sensor: baked colors are a height ramp, no camera images exist
 
   useEffect(() => {
-    loadIndex().then((ix) => { setIndex(ix); setSel(ix.cases[0]?.case_id ?? ''); }).catch((e) => setErr(String(e)));
+    loadIndex().then((ix) => {
+      setIndex(ix);
+      const first = ix.cases.find((c) => c.case_id.startsWith('RGBD_')) ?? ix.cases.find((c) => c.case_id.startsWith('OWN_')) ?? ix.cases[0];
+      setSel(first?.case_id ?? '');
+    }).catch((e) => setErr(String(e)));
   }, []);
   // SCENARIO -> METHOD model. A scenario is the input data (a scene captured with specific sensors); a method is
   // what we apply to it. RGB-only scenarios support Track A only; RGB+depth scenarios support Track A (using only
@@ -109,7 +112,10 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         <label className="lab">{es(lang) ? 'Escenario (datos de entrada)' : 'Scenario (input data)'}</label>
         <select value={curScene?.id ?? ''} onChange={(e) => {
           const s = SCENES.find((x) => x.id === e.target.value);
-          if (s) setSel(s.methods[0].caseId);
+          // default method priority: Track B if available, else Track A, else whatever remains (Felipe 2026-07-06)
+          if (s) setSel((s.methods.find((m) => /track b/i.test(m.label))
+            ?? s.methods.find((m) => /track a/i.test(m.label))
+            ?? s.methods[0]).caseId);
         }}>
           {(['rgb+depth', 'rgb', 'lidar', 'synthetic'] as SceneInputs[]).map((inp) => {
             const group = SCENES.filter((s) => s.inputs === inp);
@@ -176,7 +182,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
         <label className="lab">{es(lang) ? 'Densidad de puntos' : 'Point density'}</label>
         <input type="range" min={1} max={5} step={1} value={detail} onChange={(e) => setDetail(+e.target.value)} />
-        <p className="hint">{es(lang) ? 'Parte baja para fluidez; súbela hasta donde rinda tu equipo' : 'Starts low for fluidity; raise it as far as your machine handles'}</p>
+        <p className="hint">{es(lang) ? 'Densidad completa por defecto; bájala si tu equipo pierde fluidez' : 'Full density by default; lower it if your machine loses fluidity'}</p>
 
         <label className="lab">Color</label>
         <div className="chips">

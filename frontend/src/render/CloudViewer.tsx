@@ -13,14 +13,14 @@ export type ColorMode = 'rgb' | 'depth';
 export type CameraMode = 'orbit' | 'first' | 'top';
 
 // a soft round sprite so points render as discs that merge into a surface (the "surfels" method), not squares
-let _disc: THREE.Texture | null = null;
 function discTexture(): THREE.Texture {
-  if (_disc) return _disc;
+  // built per call (cheap 64x64 canvas): a module-cached texture can hold a GPU handle from a DISPOSED WebGL
+  // context (dev double-mount / context loss), which left the initial surfels mount blank until a toggle.
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d')!; const rad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   rad.addColorStop(0, 'rgba(255,255,255,1)'); rad.addColorStop(0.7, 'rgba(255,255,255,1)'); rad.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = rad; g.beginPath(); g.arc(32, 32, 32, 0, Math.PI * 2); g.fill();
-  _disc = new THREE.CanvasTexture(c); return _disc;
+  return new THREE.CanvasTexture(c);
 }
 
 function ramp(t: number): [number, number, number] {
@@ -92,7 +92,10 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     m.transparent = surfel; m.alphaTest = surfel ? 0.4 : 0;
     m.needsUpdate = true;
     api.current.render();
-  }, [pointSize, surfel]);
+    // cold mount: the disc texture uploads to the GPU on first use; paint again on the next two frames so the
+    // surfels never show as a blank canvas before the texture lands (seen with surfels as the default renderer)
+    requestAnimationFrame(() => { api.current?.render(); requestAnimationFrame(() => api.current?.render()); });
+  }, [pointSize, surfel, trace]); // trace dep: re-apply after the cloud loads (surfels-by-default initial mount)
 
   useEffect(() => {
     const a = api.current; if (!a || !trace) return;
@@ -164,7 +167,18 @@ export function CloudViewer({ trace, pointSize, dark, density, reveal, colorMode
     caseRef.current = trace.case_id;
     if (isNewCase) { orbitCam.current = null; positionCamera(true); } // ONLY re-fit on a new case; never on config changes
     applyReveal(); a.resize();
-    requestAnimationFrame(() => { a.resize(); requestAnimationFrame(() => a.resize()); });
+    // warm-up repaint window: on a cold mount a late layout/context event can clear the drawing buffer AFTER
+    // our last render, leaving a blank first paint (seen with surfels as the default renderer). Repaint every
+    // frame for a BOUNDED 3 s window after data load, then stop for good (render-on-demand after; complies with
+    // the no-idle-rAF rule: bounded, one-time, self-terminating).
+    const t0 = performance.now();
+    let warm = 0;
+    const warmup = () => {
+      a.resize();
+      if (performance.now() - t0 < 3000) warm = requestAnimationFrame(warmup); else warm = 0;
+    };
+    warm = requestAnimationFrame(warmup);
+    return () => { if (warm) cancelAnimationFrame(warm); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trace, density, colorMode]);
 

@@ -1,7 +1,7 @@
 {
   "schema": "lidar3d.index/v1",
-  "engine_version": "0.13.002",
-  "n_cases": 21,
+  "engine_version": "0.13.005",
+  "n_cases": 24,
   "cases": [
     {
       "case_id": "DICP_tum_desk",
@@ -9,9 +9,24 @@
       "manifest_path": "manifests/DICP_tum_desk.json"
     },
     {
+      "case_id": "DICP_tum_desk2",
+      "category": "classical: depth-only ICP (no RGB in the pose)",
+      "manifest_path": "manifests/DICP_tum_desk2.json"
+    },
+    {
       "case_id": "DICP_tum_office",
       "category": "classical: depth-only ICP (no RGB in the pose)",
       "manifest_path": "manifests/DICP_tum_office.json"
+    },
+    {
+      "case_id": "DICP_tum_pioneer",
+      "category": "classical: depth-only ICP (no RGB in the pose)",
+      "manifest_path": "manifests/DICP_tum_pioneer.json"
+    },
+    {
+      "case_id": "DICP_tum_xyz",
+      "category": "classical: depth-only ICP (no RGB in the pose)",
+      "manifest_path": "manifests/DICP_tum_xyz.json"
     },
     {
       "case_id": "LID_synthetic",
