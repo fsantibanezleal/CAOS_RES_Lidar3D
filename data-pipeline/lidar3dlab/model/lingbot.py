@@ -61,10 +61,12 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
                                          keyframe_interval=1, output_device=torch.device("cpu"))
 
     extr, intr = pose_encoding_to_extri_intri(pred["pose_enc"], (H, W))
-    e4 = torch.zeros((*extr.shape[:-2], 4, 4), dtype=extr.dtype)
-    e4[..., :3, :4] = extr.cpu()
-    e4[..., 3, 3] = 1.0
-    c2w = closed_form_inverse_se3_general(e4)[..., :3, :4].reshape(-1, 3, 4).numpy()
+    # The pose encoding decodes to CAMERA-TO-WORLD already (verified empirically on the oxford walk: using it
+    # directly gives forward-facing motion, cos(fwd, motion) +0.79, a smooth 5.5 m path; inverting it gave a
+    # BACKWARDS camera, cos -0.48, and a jagged 13.9 m path, the "reconstruction is backwards" bug). Do NOT
+    # invert. closed_form_inverse_se3_general stays imported for reference but unused here.
+    _ = closed_form_inverse_se3_general  # kept for reference; see the convention note above
+    c2w = extr.cpu().reshape(-1, 3, 4).numpy()
     K = intr.reshape(-1, 3, 3).cpu().numpy()
     depth = np.asarray(pred["depth"]).reshape(S, H, W)
     conf = np.asarray(pred.get("depth_conf")).reshape(S, H, W) if "depth_conf" in pred else None
