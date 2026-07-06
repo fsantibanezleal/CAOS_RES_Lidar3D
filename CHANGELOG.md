@@ -3,6 +3,16 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.004] · 2026-07-05
+
+### Changed
+- **No autoplay; land on the full rendered scene.** Selecting a scenario or method now shows the COMPLETE
+  reconstruction at 100% immediately (directly comparable across methods); the replay animation and the
+  frame scrub are user-initiated only. Removes the on-load auto-replay (which also violated the standing
+  no-autoplay rule).
+- Cones overlay disabled by default: the first view is the clean cloud (+ the thin trajectory line); every
+  overlay is opt-in.
+
 ## [0.13.003] · 2026-07-05
 
 ### Added

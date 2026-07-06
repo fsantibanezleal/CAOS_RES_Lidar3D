@@ -28,7 +28,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
   const [camMode, setCamMode] = useState<CameraMode>('orbit');
   const [renderer, setRenderer] = useState<'three' | 'deck' | 'surfels' | 'potree'>('three');
   const [rightTab, setRightTab] = useState<'depth' | 'rgb'>('depth');
-  const [showCones, setShowCones] = useState(true);
+  const [showCones, setShowCones] = useState(false); // overlays OFF by default: land on the clean full scene (Felipe 2026-07-05)
   const [showTraj, setShowTraj] = useState(true);
   const [showObb, setShowObb] = useState(false); // OBB + RGB axes overlay to compare the coordinate frame across renderers
   const raf = useRef(0);
@@ -51,12 +51,9 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel]);
   useEffect(() => () => stopPlay(), []);
-  useEffect(() => {
-    if (!trace) return;
-    const id = setTimeout(() => replay(), 120); // auto-play the build once (also guarantees the first paint)
-    return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trace]);
+  // NO auto-play. Selecting a scenario/method lands on the FULL rendered scene (reveal=1, set on load above), so
+  // methods are directly comparable at a glance; the replay/scrub is user-initiated only (Felipe 2026-07-05, and
+  // the standing no-autoplay rule). The render loop paints the static cloud on mount, no animation needed.
 
   function stopPlay() { if (raf.current) cancelAnimationFrame(raf.current); raf.current = 0; setPlaying(false); }
   function replay() {
