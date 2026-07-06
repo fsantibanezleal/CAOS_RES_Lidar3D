@@ -3,6 +3,20 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.13.007] · 2026-07-06
+
+### Added
+- **The LIVE lane is ACTIVE**: `app/` FastAPI now exposes POST `/api/live/reconstruct` (run any registered
+  engine on a folder of YOUR frames or a TUM-layout RGB-D root, next to your GPU) and GET `/api/live/health`
+  (CUDA + engine detection). End-to-end tested: 30 RGB-D frames reconstruct in ~2.3 s (rgbd-sensor, RTX 4070).
+
+### Changed
+- README rewritten to state the real product: the scenario-first App, the measured 5x3 method matrix, the
+  two-track framing (Estela is OURS; lingbot-map is the pointmap SOTA reference, not the product core), why
+  the public web is replay (engines need CUDA) and how to run live mode, verified-bakes summary (24 cases).
+- docs + engine-module + App i18n hints updated: the offline lane bakes with ALL engines (not "the lingbot
+  engine"), and the live lane is active with the exact command.
+
 ## [0.13.006] · 2026-07-06
 
 ### Added

@@ -68,7 +68,7 @@ diagram of the GCT + the unprojection and edit the `science` tab body.
 
 | id | tab | must show (Lidar3D specifics) |
 |----|-----|------------------------------|
-| `lanes` | Lanes: web / offline / compute | **offline** = the real lingbot-map engine bakes artifacts on a GPU; **replay** = the static SPA renders them; **live** = the dormant local-GPU API. Note there is **no browser-live engine** (the model is too heavy). |
+| `lanes` | Lanes: web / offline / compute | **offline** = every registered engine bakes artifacts (Estela, rgbd-sensor, depth-icp, lingbot-map, LiDAR ICP, synthetic; GPU or CPU per engine); **replay** = the static SPA renders them; **live** = the ACTIVE local-GPU API (`app/`, POST /api/live/reconstruct on your own footage). There is **no browser-live engine** (the heavy models need CUDA). |
 | `web-flow` | Web-app flow | the App **replays** committed artifacts (not live recompute here); the 6 pages; the contract mirror (`io/schema.py` ↔ `contract.types.ts`); `copy-data.mjs`; GitHub Pages deploy. |
 | `design` | Data contracts / design | **CONTRACT 1** (RGB/LiDAR ingestion gate: accept/reject/flag, [guide 02](02_bring-your-own-data.md)) + **CONTRACT 2** (the artifact manifest) + the measured lane gate + cases-by-category. |
 
