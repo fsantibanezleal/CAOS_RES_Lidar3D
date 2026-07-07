@@ -84,26 +84,60 @@ effort goes to a stronger learned front-end (better pose/depth/matching) or the 
 (2) the shipped ICP-for-bake improves LOCAL cloud consistency but worsens GLOBAL ATE, a real tradeoff, so flipping
 the bake default to raw is a cloud-quality-vs-ATE judgment that needs a visual check, not an automatic flip.
 
-**Pointmap-paradigm probe (2026-07-04, CORRECTED): lingbot ties Estela up to scale; the gap is METRIC SCALE, not
-shape.** To test whether a pointmap model (which predicts geometry + pose jointly and sidesteps the per-pair
-ceiling) wins on our indoor scenes, we ran the vendored `lingbot` engine (VGGT-style GCTStream, ~7 GB, 4.6 GB
-checkpoint) on `long_office` (matched first 150 frames) and measured trajectory ATE (it predicts poses).
+**Pointmap-paradigm probe (2026-07-06, re-scored on corrected poses): lingbot matches Estela in SHAPE up to
+scale; the gap is METRIC SCALE.** To test whether a pointmap model (which predicts geometry + pose jointly and
+sidesteps the per-pair ceiling) wins on our indoor scenes, we ran the vendored `lingbot` engine (VGGT-style
+GCTStream, ~7 GB, 4.6 GB checkpoint) on 3 TUM scenes (matched first 150 frames) and measured trajectory ATE.
 
-- **First report (flawed):** rigid-only Umeyama gave lingbot 0.350 m vs Estela raw 0.124 m, and we concluded
-  Estela was 3x better. But lingbot's output is monocular up-to-scale (its trajectory came out at ~0.11x metric
-  scale; the cloud bbox read ~1.5 m for a ~5 m room), and rigid-only alignment destroys a shape-correct
-  wrong-scale trajectory. The standard monocular protocol is Sim(3) (scale + rigid).
-- **Corrected, Sim(3):** lingbot **0.111 m** (recovered scale 8.8x) vs Estela raw 0.124 m (metric; Sim(3) does not
-  change it materially). So the general-purpose lingbot, NOT fine-tuned on TUM, matches our TUM-trained model's
-  trajectory SHAPE out of the box, with drift-free streaming over its fixed three-tier memory. What it lacks is
-  the absolute METRIC scale, the exact same blocker as the DA-V2 geometric-pose path (the P1 scale finding).
+- **Rigid-only Umeyama is unfair to a monocular method:** lingbot is up-to-scale (recovered scale 2.7x to 8.8x;
+  its cloud reads ~1.5 m for a ~5 m room), so rigid alignment destroys a shape-correct wrong-scale trajectory.
+  The standard monocular protocol is Sim(3) (scale + rigid). (Note: these numbers were first measured on the #77
+  backwards-pose bug; re-scored here on the corrected c2w poses. Sim(3) is scale/rotation invariant, so the
+  figures barely moved, but the raw camera trajectory is now the real one.)
+- **Sim(3) ATE, corrected poses (vs Estela raw metric ATE, same frames):**
+
+  | scene | lingbot Sim(3) | Estela raw (metric) |
+  |---|---|---|
+  | long_office | **0.104 m** | 0.131 m |
+  | freiburg1_desk | 0.157 m | 0.136 m |
+  | freiburg2_pioneer | **0.082 m** | 0.031 m |
+
+  So the general-purpose lingbot, NOT fine-tuned on TUM, matches or beats our TUM-trained model's trajectory
+  SHAPE on 2 of 3 scenes out of the box, with drift-free streaming over its fixed three-tier memory. What it
+  lacks is absolute METRIC scale, the same blocker as the DA-V2 geometric-pose path (the P1 scale finding).
 - The cloud remains diffuse at the per-point level vs Estela's conf-filtered cloud, and per-scene metric scale is
   still required for a deployable bake (our product renders metric scenes), so the practical conclusions stand:
   Estela stays deployed, and SCALE is the single blocker across every path.
 
-Honest conclusion from the two probes (revised): the 0.28 m per-pair ceiling is not broken by geometric
-post-processing; the pointmap engine already matches Estela in shape and would likely beat it with a metric-scale
-anchor. Everything now converges on ONE problem: per-scene monocular metric scale.
+Honest conclusion: the 0.28 m per-pair ceiling is not broken by geometric post-processing; the pointmap engine
+already matches Estela in shape and would beat it with a metric-scale anchor. Everything converges on ONE
+problem, per-scene monocular metric scale, and the scale-learnability diagnostic (below) shows that problem has
+no RGB-only solution.
+
+**Scale-learnability diagnostic (2026-07-06): the RGB-only metric scale has no learnable signal.** Before
+building a learned scale head for Track A, we measured whether the metric-scale error is even learnable: per
+frame, the true correction is `s = median(GT_depth) / median(DA-V2_depth)` over co-valid pixels. Result: the
+correct scale is a well-defined per-SCENE constant (desk 0.68, office 1.00, pioneer 0.59) with only 9-14%
+within-scene drift, but those per-scene constants are NOT predictable from a single RGB frame, and monocular
+vision provably cannot observe absolute scale. So a pure-RGB scale head has no reliable input; it would need a
+metric anchor. **Conclusion (retires the learned-scale-head idea): the ~0.02-0.03 m oracle ceiling is reachable
+ONLY with a metric anchor, i.e. a depth sensor (Track B, shipped) or an external cue (camera height / IMU /
+reference object). Track A stays honestly up-to-scale.** `wip/lidar3d/exp_scale_learnability.py` in the mgmt repo.
+
+**Anchor-hybrid (lingbot shape + a metric anchor): NEGATIVE, scene-dependent.** One more Track A attempt: scale
+lingbot's up-to-scale trajectory by a metric anchor derived from Estela's own chain (aggregate path length, and
+the median per-pair step ratio), then measure rigid metric ATE. On corrected poses:
+
+| scene | Estela raw | lingbot Sim(3) bound | + path-length anchor | + median-step anchor |
+|---|---|---|---|---|
+| long_office | 0.131 | 0.104 | 0.181 | **0.106** |
+| freiburg1_desk | 0.136 | 0.157 | 0.199 | 0.188 |
+| freiburg2_pioneer | 0.031 | 0.082 | 0.118 | 0.127 |
+
+The median-step anchor reaches the shape bound on `long_office` (0.106 m, ~19% better than Estela there), but is
+WORSE than Estela on desk and pioneer. It is not robust, so it is not productized: the anchor is only as good as
+the Estela chain it borrows from, and that varies per scene. Documented as a negative; Track B (a real sensor)
+remains the only reliable metric path.
 
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
