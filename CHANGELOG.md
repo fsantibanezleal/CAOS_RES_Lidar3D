@@ -3,6 +3,20 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.15.000] · 2026-07-09
+
+### Added
+- **Track B TSDF surface fusion (performance pass I3), now the default cloud.** The raw per-frame accumulation is
+  replaced by KinectFusion-style TSDF volumetric integration of the sensor depth (12 mm voxels): every valid, near
+  depth frame is integrated into a truncated signed-distance volume at its solved pose, then a single DENOISED
+  surface is extracted. Track B's poses are now tight enough (0.014-0.040 m after I1) that the volumetric averaging
+  cancels the per-frame sensor noise and the double-surfaces raw accumulation showed, giving a markedly cleaner
+  surface at ~half the points (office 150k -> 78k, desk -> 58k). Screenshot-verified clean across all 5 scenes
+  (small desk to the large pioneer robot run). Opt out with `LIDAR3D_RGBD_TSDF=0`; falls back to raw accumulation
+  when open3d is absent, so the live lane matches replay and a scene is never blank. All five Track B cases
+  re-baked. `rgbd_engine.py` (`_fuse_tsdf_sensor`). This mirrors why TSDF stays opt-in on the RGB-only 0.37 m
+  poses (there it carves sparsely); on Track B's tight poses it finally pays off.
+
 ## [0.14.000] · 2026-07-09
 
 ### Added

@@ -11,14 +11,18 @@ matches whose local sensor-depth patch is filled and flat (the depth-edge guard,
 a 1 px error back-projects to a large 3D error), back-project the surviving frame-i matches to 3D with the SENSOR
 depth, and solve the relative pose with PnP + RANSAC. A DISK + LightGlue learned matcher is available opt-in
 (LIDAR3D_MATCHER=lightglue) but is not the default: end-to-end, with fusion + the guard, SIFT beats it on 3/5
-scenes (learned_match.py). Chain into camera-to-world, unproject every frame's sensor depth (holes = invalid 0
-are dropped), and fuse the metric cloud. Honest: every number the sensor did not measure is absent, not invented.
+scenes (learned_match.py). Chain into camera-to-world, then fuse the cloud by TSDF volumetric integration of the
+sensor depth (I3 2026-07-09, default; opt out with LIDAR3D_RGBD_TSDF=0): Track B's tight poses let the volume
+average per-frame sensor noise into a clean DENOISED surface at ~half the points, falling back to raw per-frame
+accumulation when open3d is absent. Honest: every number the sensor did not measure is absent, not invented.
 
 Data contract: `spec.source_dir` is a TUM-format sequence root (rgb/ + depth/ + rgb.txt + depth.txt +
 groundtruth.txt optional); frames are associated by nearest timestamp exactly like the training loader.
 Registered as `rgbd-sensor` in the model-agnostic registry.
 """
 from __future__ import annotations
+
+import os
 
 import numpy as np
 
@@ -52,6 +56,39 @@ def _depth_ok(uv: np.ndarray, depth: np.ndarray) -> np.ndarray:
             zn = depth[np.clip(v + dv, 0, H - 1), np.clip(u + du, 0, W - 1)]
             flat &= (zn > 0.1) & (np.abs(zn - z) < _DEDGE)     # neighbour valid AND flat (no depth jump)
     return flat if flat.sum() >= _GUARD_MIN else valid
+
+
+def _fuse_tsdf_sensor(depths, rgbs, c2ws, K, max_d: float, voxel: float = 0.012):
+    """TSDF volumetric fusion of the SENSOR depth (KinectFusion-style), for Track B's tight metric poses. Every
+    valid, near depth frame is integrated into a truncated signed-distance volume at its solved pose, then a single
+    DENOISED surface cloud (with colours) is extracted. Volumetric averaging cancels the per-frame sensor noise and
+    the double-surfaces that raw per-frame accumulation shows, which no pose refinement can remove. Track B has no
+    learned confidence, so the sensor's own validity (depth in (0.1, max_d)) IS the mask, nothing is inpainted.
+    Returns (points [N,3] f32, colours [N,3] u8), or None if open3d is unavailable (caller keeps raw accumulation)."""
+    try:
+        import open3d as o3d
+    except Exception:  # noqa: BLE001 (no open3d -> caller falls back to raw accumulation)
+        return None
+    H, W = depths[0].shape
+    vol = o3d.pipelines.integration.ScalableTSDFVolume(
+        voxel_length=voxel, sdf_trunc=voxel * 3,
+        color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
+    intr = o3d.camera.PinholeCameraIntrinsic(W, H, float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2]))
+    for i in range(len(depths)):
+        d = depths[i].astype(np.float32).copy()
+        d[(d < 0.1) | (d >= max_d)] = 0.0                       # sensor holes + far range invalid (0)
+        col = o3d.geometry.Image(np.ascontiguousarray((np.clip(rgbs[i], 0, 1) * 255).astype(np.uint8)))
+        dep = o3d.geometry.Image(np.ascontiguousarray(d))
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            col, dep, depth_scale=1.0, depth_trunc=max_d, convert_rgb_to_intensity=False)
+        vol.integrate(rgbd, intr, np.linalg.inv(c2ws[i]))       # extrinsic = world-to-cam
+    pcd = vol.extract_point_cloud()
+    pts = np.asarray(pcd.points, np.float32)
+    if len(pts) == 0:
+        return None
+    cols = (np.asarray(pcd.colors) * 255.0).clip(0, 255).astype(np.uint8) if pcd.has_colors() \
+        else np.full((len(pts), 3), 180, np.uint8)
+    return pts, cols
 
 
 def _chain(rel_pose, n: int) -> tuple[list, int]:
@@ -225,6 +262,21 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG
 
     pts = np.concatenate(all_p).astype(np.float32)
     cols = np.concatenate(all_c).astype(np.uint8)
+
+    # DEFAULT (opt out with LIDAR3D_RGBD_TSDF=0): replace the raw per-frame accumulation with a TSDF-fused DENOISED
+    # surface (I3, 2026-07-09). Track B's poses are tight enough (0.014-0.040 m) that the volume averages out the
+    # per-frame sensor noise and the double-surfaces raw accumulation shows, giving a markedly cleaner surface at
+    # ~half the points (screenshot-verified across all 5 scenes, small desk -> large pioneer robot run). Keeps the
+    # raw cloud when open3d is missing or the volume is empty, so the live lane matches replay and a scene is never
+    # blank (honest fallback).
+    if os.environ.get("LIDAR3D_RGBD_TSDF", "1") != "0":
+        max_d = spec.max_render_depth if spec.max_render_depth > 0 else 6.0
+        voxel = float(os.environ.get("LIDAR3D_RGBD_TSDF_VOXEL", "0.012"))
+        fused = _fuse_tsdf_sensor(depths, rgbs, c2ws, K, max_d, voxel=voxel)
+        if fused is not None:
+            pts, cols = fused
+            print(f"  [rgbd-sensor] TSDF fusion: {len(pts)} surface points")
+
     if fallbacks:
         print(f"  [rgbd-sensor] {fallbacks}/{n - 1} pairs had too few valid matches (pose held)")
     return ReconResult(

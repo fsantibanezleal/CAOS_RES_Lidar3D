@@ -39,8 +39,13 @@ Per RGB pair (consecutive AND skip, see the fusion below):
    window by the shared frame. This is the M-C solve in production: over these STRONG metric edges it measurably
    cuts drift (7 to 26% on the validation scenes; over weak monocular edges it fails, the P0.1 finding), which is
    exactly what the M-C synthetic self-test predicted. Falls back to the plain consecutive chain without torch.
-6. **Fuse the cloud**: unproject every frame's sensor depth at its solved pose. What the sensor did not measure is
-   absent from the cloud; nothing is hallucinated.
+6. **Fuse the cloud with TSDF volumetric integration** (I3, 2026-07-09, default; opt out with
+   `LIDAR3D_RGBD_TSDF=0`): integrate every valid, near sensor-depth frame into a truncated signed-distance volume
+   (voxel 12 mm) at its solved pose, then extract a single DENOISED surface cloud. Track B's poses are tight enough
+   (0.014-0.040 m) that the volumetric averaging cancels the per-frame sensor noise and the double-surfaces that
+   raw accumulation shows, giving a markedly cleaner surface at ~half the points. What the sensor did not measure is
+   still absent (the sensor's validity is the only mask; nothing is inpainted). Falls back to raw per-frame
+   accumulation when open3d is unavailable, so the live lane matches replay and a scene is never blank.
 
 ## I1 negative: the learned matcher is not a deployed win (measured, kept opt-in)
 
