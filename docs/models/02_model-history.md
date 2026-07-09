@@ -139,6 +139,18 @@ WORSE than Estela on desk and pioneer. It is not robust, so it is not productize
 the Estela chain it borrows from, and that varies per scene. Documented as a negative; Track B (a real sensor)
 remains the only reliable metric path.
 
+**M-C windowed fusion over the SIAMESE edges (2026-07-06): NEGATIVE, and it completes the M-C story.** The last
+untested cell: does `window_pgo` help over Estela's own Siamese poses (including the skip edges i->i+2 the raw
+chain never uses)? Raw Siamese chain vs windowed fusion, 240 frames: desk 0.137 -> 0.254 (-85%), office 0.198 ->
+0.359 (-81%), desk2 0.119 -> 0.127, xyz 0.184 -> 0.164 (+11%), pioneer 0.115 -> 0.112 (+2%). Catastrophic on the
+desk/office scenes. Root cause: the Siamese head regresses each relative pose INDEPENDENTLY with no shared scale,
+so a skip edge contradicts the two consecutive edges it spans, and the joint solve averages inconsistent
+constraints. This is the same failure as ICP edges (P0.1). The complete M-C matrix: the windowed fusion is a
+multiplier on edge CONSISTENCY, not just edge quality; it HELPS only over metric-consistent edges (Track B's
+sensor-anchored PnP, 7-26%) and HURTS over geometrically-inconsistent ones (Siamese regression, ICP). This closes
+every Track A avenue: the deployed per-pair Estela is the RGB-only best, and metric accuracy needs a sensor
+(Track B). `wip/lidar3d/exp_siamese_window.py`.
+
 
 **Checkpoint-loss lesson (repeated).** Running two Siamese runs with the same backbone tag overwrote the 0.37 m
 checkpoint with a killed-early run's worse checkpoint (0.77 m). The *deployed* artifacts (v0.11.000) are safe (baked +
