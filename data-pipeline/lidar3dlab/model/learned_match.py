@@ -26,7 +26,6 @@ class LearnedMatcher:
     """DISK keypoints + descriptors, matched pairwise by LightGlue. Precompute once, match many."""
 
     def __init__(self, imgs_uint8: list[np.ndarray], max_kpts: int = 2048):
-        import kornia as K
         import kornia.feature as KF
         import torch
 
