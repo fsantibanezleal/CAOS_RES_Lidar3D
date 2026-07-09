@@ -22,18 +22,38 @@ therefore not a luxury: it is the configuration where the measured ~10x ceiling 
 
 Per RGB pair (consecutive AND skip, see the fusion below):
 
-1. **Match** SIFT keypoints on the RGB frames (Lowe ratio 0.75).
-2. **Back-project** the frame-i matches to 3D camera-frame points with the SENSOR depth (metric metres; sensor
-   holes, depth 0, and far returns beyond 8 m are discarded, never inpainted).
-3. **Solve** the relative pose with PnP + RANSAC (frame-i 3D points against their frame-j pixels, reprojection
+1. **Match** SIFT keypoints on the RGB frames (Lowe ratio 0.75). A DISK + LightGlue learned matcher is available
+   opt-in (`LIDAR3D_MATCHER=lightglue`) but SIFT is the default, see the depth-edge guard and the I1 negative below.
+2. **Depth-edge guard** (I1, 2026-07-06): keep only the matches whose local sensor-depth patch (a small pixel
+   neighbourhood in frame i) is filled AND flat, dropping correspondences at depth discontinuities, where a 1 px
+   match error back-projects to a large 3D error. If too few survive it falls back to the plain valid set, so
+   depth-rich scenes are never starved into pose-holds. This is matcher-independent and is the real Track B win of
+   the pass: SIFT ATE `office` 0.077 to 0.038 m (+51%), `desk` 0.041 to 0.032 (+22%), `desk2` 0.016 to 0.014, with
+   `pioneer`/`xyz` unchanged.
+3. **Back-project** the surviving frame-i matches to 3D camera-frame points with the SENSOR depth (metric metres;
+   sensor holes, depth 0, and far returns beyond 8 m are discarded, never inpainted).
+4. **Solve** the relative pose with PnP + RANSAC (frame-i 3D points against their frame-j pixels, reprojection
    threshold 3 px), giving $T_{i\to j}$ and the RANSAC inlier count (the edge's confidence).
-4. **Fuse the trajectory with the windowed pose-graph** (Estela-W's `window_pgo`, run forward-only): overlapping
+5. **Fuse the trajectory with the windowed pose-graph** (Estela-W's `window_pgo`, run forward-only): overlapping
    6-frame windows, edges = 5 consecutive + 4 skip-2, per-edge weight = the PnP inlier count, composed window to
    window by the shared frame. This is the M-C solve in production: over these STRONG metric edges it measurably
    cuts drift (7 to 26% on the validation scenes; over weak monocular edges it fails, the P0.1 finding), which is
    exactly what the M-C synthetic self-test predicted. Falls back to the plain consecutive chain without torch.
-5. **Fuse the cloud**: unproject every frame's sensor depth at its solved pose. What the sensor did not measure is
+6. **Fuse the cloud**: unproject every frame's sensor depth at its solved pose. What the sensor did not measure is
    absent from the cloud; nothing is hallucinated.
+
+## I1 negative: the learned matcher is not a deployed win (measured, kept opt-in)
+
+The pass first tried a SOTA learned matcher (DISK keypoints + LightGlue, kornia) in place of SIFT. Isolated over a
+plain chain it looked decisive: +13 to +27% ATE on 4/5 scenes with 2-3x more inliers (e.g. `pioneer` 78 to 193
+matches on motion-blurred frames). But measured end-to-end through the ACTUAL deployed pipeline (window fusion +
+the depth-edge guard), the advantage collapses: the fusion already absorbs most drift, and the guard removes
+exactly the noisier, more-distributed matches the learned matcher added, so SIFT beats LightGlue on 3/5 scenes
+(`office` 0.038 vs 0.049, `pioneer` 0.040 vs 0.052, `desk2` 0.014 vs 0.021). It is therefore NOT the default. It
+stays available (`LIDAR3D_MATCHER=lightglue`) because its much higher inlier count is a genuine robustness asset on
+hard or blurred imagery, which the clean TUM benchmark does not reward. The lesson is the standing one: measure the
+real deployed pipeline, not an isolated probe: the probe said "ship the learned matcher", the deployment said "the
+guard is the win, the matcher is a wash".
 
 If a pair has too few valid matches (rare: zero occurrences across the validation scenes), the pose HOLDS rather
 than inventing motion, and the event is counted.

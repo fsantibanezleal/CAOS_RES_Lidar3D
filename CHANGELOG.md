@@ -3,6 +3,24 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.14.000] · 2026-07-09
+
+### Added
+- **Track B depth-edge guard (performance pass I1).** The RGB-D geometric pose now keeps only correspondences
+  whose local sensor-depth patch is filled and flat, dropping matches at depth discontinuities where a 1 px error
+  back-projects to a large 3D error. Falls back to the plain valid set when too few survive, so depth-rich scenes
+  are never starved into pose-holds. Matcher-independent, measured end-to-end (fusion included): `office` 0.077 to
+  0.038 m (+51%), `desk` 0.041 to 0.032 (+22%), `desk2` 0.016 to 0.014, `pioneer`/`xyz` unchanged. All five Track B
+  cases re-baked. `rgbd_engine.py` (`_DZ`, `_DEDGE`, `_GUARD_MIN`).
+- **Opt-in DISK + LightGlue learned matcher** (`model/learned_match.py`, `LIDAR3D_MATCHER=lightglue`, kornia). A
+  SOTA correspondence option for hard/blurred imagery (2-3x more inliers than SIFT).
+
+### Measured (honest negative)
+- **The learned matcher is not a deployed win on clean benchmarks, so SIFT stays the default.** Isolated over a
+  plain chain LightGlue won 4/5 scenes (+13-27%), but end-to-end (window fusion + the depth-edge guard) SIFT beats
+  it on 3/5, because the guard removes exactly the noisier matches the learned matcher added. Kept available
+  opt-in. The isolated probe overclaimed; the deployed measurement is the record.
+
 ## [0.13.008] · 2026-07-06
 
 ### Fixed
