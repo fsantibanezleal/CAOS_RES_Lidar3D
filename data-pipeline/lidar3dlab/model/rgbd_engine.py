@@ -5,10 +5,14 @@ monocular metric-scale ambiguity is the measured blocker; Track B integrates the
 sensor (Kinect/LiDAR-class), whose depth is metric BY CONSTRUCTION, so the scale problem disappears at the source.
 
 Method (validated 2026-07-04, wip/lidar3d/exp_sensor_depth.py: 0.034-0.098 m ATE across TUM scenes, ~3x better
-than the deployed RGB-only trajectory, zero fallbacks): per consecutive pair, match SIFT keypoints on the RGB,
-back-project the frame-i matches to 3D with the SENSOR depth, and solve the relative pose with PnP + RANSAC.
-Chain into camera-to-world, unproject every frame's sensor depth (holes = invalid 0 are dropped), and fuse the
-metric cloud. Classical, transparent, and honest: every number the sensor did not measure is absent, not invented.
+than the deployed RGB-only trajectory, zero fallbacks): per pair, match SIFT keypoints on the RGB, KEEP only the
+matches whose local sensor-depth patch is filled and flat (the depth-edge guard, probe I1 2026-07-06: cuts ATE
+~22-51% on the harder scenes, office 0.077 -> 0.038 m, by dropping correspondences at depth discontinuities where
+a 1 px error back-projects to a large 3D error), back-project the surviving frame-i matches to 3D with the SENSOR
+depth, and solve the relative pose with PnP + RANSAC. A DISK + LightGlue learned matcher is available opt-in
+(LIDAR3D_MATCHER=lightglue) but is not the default: end-to-end, with fusion + the guard, SIFT beats it on 3/5
+scenes (learned_match.py). Chain into camera-to-world, unproject every frame's sensor depth (holes = invalid 0
+are dropped), and fuse the metric cloud. Honest: every number the sensor did not measure is absent, not invented.
 
 Data contract: `spec.source_dir` is a TUM-format sequence root (rgb/ + depth/ + rgb.txt + depth.txt +
 groundtruth.txt optional); frames are associated by nearest timestamp exactly like the training loader.
@@ -26,6 +30,28 @@ _MIN_MATCHES = 12
 _MIN_INLIERS = 8
 _WIN = 6                       # window length for the pose-graph fusion
 _SKIP = 2                      # max skip-edge distance inside a window
+_DZ = 2                        # depth-edge guard: neighbour radius (px) around a matched pixel
+_DEDGE = 0.10                  # depth-edge guard: max metres of depth jump inside that neighbourhood
+_GUARD_MIN = 40                # keep the guarded set only if this many matches survive, else use the valid set
+
+
+def _depth_ok(uv: np.ndarray, depth: np.ndarray) -> np.ndarray:
+    """Per-match validity mask for PnP back-projection. A match is VALID if its sensor depth is in range, and is
+    additionally KEPT by the depth-edge guard if its local (2*_DZ+1)^2 neighbourhood is filled and flat: a 1 px
+    match error at a depth discontinuity back-projects to a large 3D error, so those correspondences are dropped.
+    The guarded set is used only when >= _GUARD_MIN survive; otherwise the plain valid set is returned so a
+    depth-rich / high-parallax scene is not starved into a pose-hold (probe I1, 2026-07-06)."""
+    H, W = depth.shape
+    u = np.clip(uv[:, 0].round().astype(int), 0, W - 1)
+    v = np.clip(uv[:, 1].round().astype(int), 0, H - 1)
+    z = depth[v, u]
+    valid = (z > 0.1) & (z < 8.0)                              # sensor holes (0) + far range are invalid
+    flat = valid.copy()
+    for du in (-_DZ, 0, _DZ):
+        for dv in (-_DZ, 0, _DZ):
+            zn = depth[np.clip(v + dv, 0, H - 1), np.clip(u + du, 0, W - 1)]
+            flat &= (zn > 0.1) & (np.abs(zn - z) < _DEDGE)     # neighbour valid AND flat (no depth jump)
+    return flat if flat.sum() >= _GUARD_MIN else valid
 
 
 def _chain(rel_pose, n: int) -> tuple[list, int]:
@@ -125,28 +151,38 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG
 
     rgbs = [load_rgb(f[0]) for f in frames]
     depths = [ds._load_depth(f[1]) for f in frames]             # SENSOR depth, metric metres, 0 = invalid
+    rgbs_u8 = [(r * 255).astype(np.uint8) for r in rgbs]
 
-    sift = cv2.SIFT_create(nfeatures=1200)
-    bf = cv2.BFMatcher(cv2.NORM_L2)
-    feats = [sift.detectAndCompute(cv2.cvtColor((r * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY), None)
-             for r in rgbs]
+    # correspondence front-end: DISK + LightGlue learned matcher (probe I1: +13-27% ATE on 4/5 scenes, far more
+    # inliers on hard/blurred frames) with classical SIFT as the CPU / no-GPU / no-weights fallback.
+    from .learned_match import build_matcher
+    matcher = build_matcher(rgbs_u8)
+    if matcher is None:
+        sift = cv2.SIFT_create(nfeatures=1200)
+        bf = cv2.BFMatcher(cv2.NORM_L2)
+        feats = [sift.detectAndCompute(cv2.cvtColor(u8, cv2.COLOR_RGB2GRAY), None) for u8 in rgbs_u8]
 
-    def rel_pose(i: int, j: int) -> tuple[np.ndarray, int] | None:
-        """Relative pose (frame j expressed in frame i) via SIFT + sensor-depth PnP RANSAC, + the inlier count
-        (used as the edge confidence for the windowed fusion)."""
+    def _sift_match(i: int, j: int):
         (ki, di), (kj, dj) = feats[i], feats[j]
         if di is None or dj is None or len(ki) < _MIN_MATCHES or len(kj) < _MIN_MATCHES:
-            return None
+            return None, None
         good = [m for m, nn in bf.knnMatch(di, dj, k=2) if m.distance < 0.75 * nn.distance]
         if len(good) < _MIN_MATCHES:
+            return None, None
+        return (np.float32([ki[m.queryIdx].pt for m in good]),
+                np.float32([kj[m.trainIdx].pt for m in good]))
+
+    def rel_pose(i: int, j: int) -> tuple[np.ndarray, int] | None:
+        """Relative pose (frame j expressed in frame i) via the learned/SIFT correspondences + sensor-depth PnP
+        RANSAC, plus the inlier count (used as the edge confidence for the windowed fusion)."""
+        uv_i, uv_j = matcher.match(i, j) if matcher is not None else _sift_match(i, j)
+        if uv_i is None or len(uv_i) < _MIN_MATCHES:
             return None
-        uv_i = np.float32([ki[m.queryIdx].pt for m in good])
-        uv_j = np.float32([kj[m.trainIdx].pt for m in good])
         d = depths[i]
         u = np.clip(uv_i[:, 0].round().astype(int), 0, d.shape[1] - 1)
         v = np.clip(uv_i[:, 1].round().astype(int), 0, d.shape[0] - 1)
         z = d[v, u]
-        ok = (z > 0.1) & (z < 8.0)                              # sensor holes (0) + far range are invalid
+        ok = _depth_ok(uv_i, d)                                 # valid depth + the depth-edge guard (with fallback)
         if ok.sum() < _MIN_INLIERS:
             return None
         p3d = np.stack([(uv_i[:, 0] - K[0, 2]) / K[0, 0] * z,

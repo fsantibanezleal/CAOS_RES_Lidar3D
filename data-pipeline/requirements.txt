@@ -11,6 +11,8 @@ opencv-python>=4.9     # per-frame quality features (stages/feature_extraction; 
 # installed by scripts/setup with the CUDA wheel index matching the local driver (NOT pinned here, NOT in CI):
 #   pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
 #   pip install -e third_party/lingbot-map --no-deps     # vendored, Apache-2.0
+#   pip install kornia>=0.8.3    # Track B learned matcher (DISK + LightGlue, model/learned_match); GPU lane only,
+#                                # falls back to SIFT (opencv, above) when torch/kornia/CUDA is absent
 # Optional refine/texture lane: open3d (CPU mesh) ; gsplat (3DGS, needs nvcc).
 
 # LiDAR + refine lane (CPU):

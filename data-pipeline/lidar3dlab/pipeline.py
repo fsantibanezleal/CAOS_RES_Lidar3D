@@ -73,7 +73,7 @@ def precompute(case_id: str, seed: int = 42) -> dict:
     if spec.engine == "own-depthpose":
         model = _own_model_label()
     elif spec.engine == "rgbd-sensor":
-        model = "RGB-D sensor geometry (SIFT + PnP on Kinect depth; metric by construction)"
+        model = "RGB-D sensor geometry (SIFT + depth-edge guard, PnP on Kinect depth; metric by construction)"
     elif spec.engine == "depth-icp":
         model = "depth-only point-to-plane ICP (no RGB in the pose; classical baseline)"
     elif spec.modality == "lidar":

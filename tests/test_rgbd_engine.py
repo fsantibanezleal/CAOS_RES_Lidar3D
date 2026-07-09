@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from lidar3dlab.io.contract import count_frames
-from lidar3dlab.model.rgbd_engine import _WIN, _chain, _trajectory
+from lidar3dlab.model.rgbd_engine import _GUARD_MIN, _WIN, _chain, _depth_ok, _trajectory
 
 
 def _make_rel(dx: float):
@@ -48,6 +48,36 @@ def test_trajectory_short_sequence_falls_back_to_chain():
     assert len(fused) == 3
     for a, b in zip(fused, chain):
         assert np.allclose(a, b)
+
+
+def test_depth_edge_guard_rejects_discontinuity_matches():
+    """With the guard active (enough flat matches survive), matches on a depth edge are dropped."""
+    depth = np.full((128, 128), 2.0, np.float32)
+    depth[:, 96:] = 5.0                                       # a vertical depth cliff at column 96
+    # >= _GUARD_MIN flat matches in the near region (columns << 96) so the guarded set is USED (not the fallback)
+    flat = np.array([[float(5 + (k % 40) * 2), float(5 + (k // 40) * 2)] for k in range(_GUARD_MIN + 5)], np.float32)
+    edge = np.array([[96.0, 10.0], [95.0, 40.0]], np.float32)  # straddling the cliff -> steep neighbourhoods
+    uv = np.concatenate([flat, edge])
+    ok = _depth_ok(uv, depth)
+    assert ok[: len(flat)].all()                              # flat matches kept
+    assert not ok[-1] and not ok[-2]                          # edge matches dropped
+
+
+def test_depth_edge_guard_falls_back_when_starved():
+    """When too few matches survive the guard (< _GUARD_MIN), the plain valid mask is returned (no starvation)."""
+    depth = np.full((64, 64), 2.0, np.float32)
+    depth[::2, :] = 5.0                                        # alternating rows: every pixel is on a depth edge
+    uv = np.array([[float(x % 64), float(x // 64 % 64)] for x in range(_GUARD_MIN - 1)], np.float32)
+    ok = _depth_ok(uv, depth)
+    assert ok.sum() == len(uv)                                 # guard starved -> fell back to the valid set (all in range)
+
+
+def test_depth_edge_guard_drops_sensor_holes():
+    depth = np.full((32, 32), 2.0, np.float32)
+    depth[5, 5] = 0.0                                          # a sensor hole
+    uv = np.array([[5.0, 5.0], [20.0, 20.0]], np.float32)
+    ok = _depth_ok(uv, depth)
+    assert not ok[0] and ok[1]
 
 
 def test_count_frames_rgbd_root(tmp_path):
