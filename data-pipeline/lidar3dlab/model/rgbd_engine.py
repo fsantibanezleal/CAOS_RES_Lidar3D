@@ -39,11 +39,13 @@ _DEDGE = 0.10                  # depth-edge guard: max metres of depth jump insi
 _GUARD_MIN = 40                # keep the guarded set only if this many matches survive, else use the valid set
 
 
-def _depth_ok(uv: np.ndarray, depth: np.ndarray) -> np.ndarray:
-    """Per-match validity mask for PnP back-projection. A match is VALID if its sensor depth is in range, and is
-    additionally KEPT by the depth-edge guard if its local (2*_DZ+1)^2 neighbourhood is filled and flat: a 1 px
-    match error at a depth discontinuity back-projects to a large 3D error, so those correspondences are dropped.
-    The guarded set is used only when >= _GUARD_MIN survive; otherwise the plain valid set is returned so a
+def _depth_ok_stats(uv: np.ndarray, depth: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-match validity mask for PnP back-projection, plus the local depth ROUGHNESS per match
+    (mean |z_neighbour - z| over the guard neighbourhood; an E4 scorer feature). A match is VALID
+    if its sensor depth is in range, and is additionally KEPT by the depth-edge guard if its local
+    (2*_DZ+1)^2 neighbourhood is filled and flat: a 1 px match error at a depth discontinuity
+    back-projects to a large 3D error, so those correspondences are dropped. The guarded set is
+    used only when >= _GUARD_MIN survive; otherwise the plain valid set is returned so a
     depth-rich / high-parallax scene is not starved into a pose-hold (probe I1, 2026-07-06)."""
     H, W = depth.shape
     u = np.clip(uv[:, 0].round().astype(int), 0, W - 1)
@@ -51,11 +53,21 @@ def _depth_ok(uv: np.ndarray, depth: np.ndarray) -> np.ndarray:
     z = depth[v, u]
     valid = (z > 0.1) & (z < 8.0)                              # sensor holes (0) + far range are invalid
     flat = valid.copy()
+    rough = np.zeros_like(z)
+    taps = 0
     for du in (-_DZ, 0, _DZ):
         for dv in (-_DZ, 0, _DZ):
             zn = depth[np.clip(v + dv, 0, H - 1), np.clip(u + du, 0, W - 1)]
             flat &= (zn > 0.1) & (np.abs(zn - z) < _DEDGE)     # neighbour valid AND flat (no depth jump)
-    return flat if flat.sum() >= _GUARD_MIN else valid
+            rough += np.abs(zn - z)
+            taps += 1
+    rough /= max(taps, 1)
+    return (flat if flat.sum() >= _GUARD_MIN else valid), rough
+
+
+def _depth_ok(uv: np.ndarray, depth: np.ndarray) -> np.ndarray:
+    """The guard mask alone (the pre-E4 public shape; tests and callers keep working)."""
+    return _depth_ok_stats(uv, depth)[0]
 
 
 def _fuse_tsdf_sensor(depths, rgbs, c2ws, K, max_d: float, voxel: float = 0.012):
@@ -91,6 +103,69 @@ def _fuse_tsdf_sensor(depths, rgbs, c2ws, K, max_d: float, voxel: float = 0.012)
     return pts, cols
 
 
+def make_rel_pose(rgbs_u8: list, depths: list, K: np.ndarray, size: int):
+    """The Track B correspondence front-end as a reusable factory (shared by reconstruct, the E4
+    dataset builder and the E4 A/B runner, so all three measure the SAME pipeline).
+
+    Returns rel_pose(i, j) -> (rel 4x4 cam_j-in-cam_i, PnP inlier count, feats[N_FEAT]) | None.
+    Front-end: DISK + LightGlue learned matcher (probe I1: +13-27% ATE isolated, SIFT beats it
+    end-to-end on 3/5, so SIFT stays the default) with classical SIFT as the CPU fallback; then
+    sensor-depth back-projection under the depth-edge guard and PnP RANSAC. The feature vector's
+    chain-gap entries (9/10) are left 0 here; the window logic fills them where the window's
+    consecutive edges are known."""
+    import cv2
+
+    from .edge_scorer import base_features
+    from .learned_match import build_matcher
+
+    matcher = build_matcher(rgbs_u8)
+    if matcher is None:
+        sift = cv2.SIFT_create(nfeatures=1200)
+        bf = cv2.BFMatcher(cv2.NORM_L2)
+        feats_sift = [sift.detectAndCompute(cv2.cvtColor(u8, cv2.COLOR_RGB2GRAY), None) for u8 in rgbs_u8]
+
+    def _sift_match(i: int, j: int):
+        (ki, di), (kj, dj) = feats_sift[i], feats_sift[j]
+        if di is None or dj is None or len(ki) < _MIN_MATCHES or len(kj) < _MIN_MATCHES:
+            return None, None
+        good = [m for m, nn in bf.knnMatch(di, dj, k=2) if m.distance < 0.75 * nn.distance]
+        if len(good) < _MIN_MATCHES:
+            return None, None
+        return (np.float32([ki[m.queryIdx].pt for m in good]),
+                np.float32([kj[m.trainIdx].pt for m in good]))
+
+    def rel_pose(i: int, j: int) -> tuple[np.ndarray, int, np.ndarray] | None:
+        """Relative pose (frame j expressed in frame i) via the learned/SIFT correspondences + sensor-depth PnP
+        RANSAC, plus the inlier count (the pre-E4 edge confidence) and the E4 feature vector."""
+        uv_i, uv_j = matcher.match(i, j) if matcher is not None else _sift_match(i, j)
+        if uv_i is None or len(uv_i) < _MIN_MATCHES:
+            return None
+        d = depths[i]
+        u = np.clip(uv_i[:, 0].round().astype(int), 0, d.shape[1] - 1)
+        v = np.clip(uv_i[:, 1].round().astype(int), 0, d.shape[0] - 1)
+        z = d[v, u]
+        ok, rough = _depth_ok_stats(uv_i, d)                    # valid depth + the depth-edge guard (with fallback)
+        if ok.sum() < _MIN_INLIERS:
+            return None
+        p3d = np.stack([(uv_i[:, 0] - K[0, 2]) / K[0, 0] * z,
+                        (uv_i[:, 1] - K[1, 2]) / K[1, 1] * z, z], 1).astype(np.float32)
+        found, rvec, tvec, inl = cv2.solvePnPRansac(p3d[ok], uv_j[ok], K, None, reprojectionError=3.0,
+                                                    iterationsCount=200, confidence=0.999)
+        if not found or inl is None or len(inl) < _MIN_INLIERS:
+            return None
+        R, _ = cv2.Rodrigues(rvec)
+        T = np.eye(4)
+        T[:3, :3] = R
+        T[:3, 3] = tvec[:, 0]                                   # cam_i -> cam_j
+        rel = np.linalg.inv(T)                                  # cam_j in cam_i, like the model's rel_pose
+        if not np.isfinite(rel).all():
+            return None
+        fv = base_features(uv_i, uv_j, ok, z[ok], rough[ok], int(len(inl)), int(ok.sum()), size, j - i - 1)
+        return rel, int(len(inl)), fv
+
+    return rel_pose
+
+
 def _chain(rel_pose, n: int) -> tuple[list, int]:
     """Plain consecutive chain (the fusion fallback). Holds pose on a failed pair rather than inventing motion."""
     c2ws = [np.eye(4)]
@@ -105,11 +180,17 @@ def _chain(rel_pose, n: int) -> tuple[list, int]:
     return c2ws, fallbacks
 
 
-def _trajectory(rel_pose, n: int) -> tuple[list, int]:
+def _trajectory(rel_pose, n: int, scorer=None) -> tuple[list, int]:
     """Windowed pose-graph fusion over the metric PnP edges: overlapping windows (stride WIN-1, shared frame),
     per-window edges = consecutive + skip (window_edges), per-edge confidence = the PnP inlier count, fused by the
     differentiable window_pgo (forward-only). Cuts drift 7-26% vs the plain chain on the validation scenes.
-    Falls back to the plain chain when torch is unavailable or the window solve fails."""
+    Falls back to the plain chain when torch is unavailable or the window solve fails.
+
+    E4 (opt-in, LIDAR3D_EDGE_SCORER): when a scorer is given, each present edge's weight becomes
+    exp(-alpha * predicted_relpose_error) from the edge's feature vector (chain-gap features
+    completed here, where the window's consecutive edges are known), rescaled per window to the
+    inlier-weight mean so the magnitude vs the solver's fixed LM damping stays in the proven
+    regime. Missing edges keep their near-zero weight either way."""
     try:
         import torch
 
@@ -135,8 +216,13 @@ def _trajectory(rel_pose, n: int) -> tuple[list, int]:
                     c2ws.append(c2ws[-1] @ e[0])
             break
         zs, ws = [], []
+        results = {}
         for (a, b) in pairs:
-            e = rel_pose(s + a, s + b)
+            results[(a, b)] = rel_pose(s + a, s + b)
+        consecutive = [results.get((k, k + 1)) for k in range(_WIN - 1)]
+        scored_idx, scored_feats = [], []
+        for idx, (a, b) in enumerate(pairs):
+            e = results[(a, b)]
             if e is None:
                 zs.append(np.eye(4))
                 ws.append(1e-3)                            # near-zero weight: a missing edge must not constrain
@@ -145,6 +231,20 @@ def _trajectory(rel_pose, n: int) -> tuple[list, int]:
             else:
                 zs.append(e[0])
                 ws.append(float(e[1]))                     # PnP inlier count = edge confidence
+                if scorer is not None and len(e) > 2 and e[2] is not None:
+                    from .edge_scorer import chain_gap
+                    feats = e[2].copy()
+                    if b - a > 1:
+                        span = [c[0] if c is not None else None for c in consecutive[a:b]]
+                        feats[9], feats[10] = chain_gap(e[0], span)
+                    scored_idx.append(idx)
+                    scored_feats.append(feats)
+        if scorer is not None and scored_idx:
+            w_pred = scorer.weights(np.stack(scored_feats))
+            inlier_mean = float(np.mean([ws[i] for i in scored_idx]))
+            scale = inlier_mean / max(float(w_pred.mean()), 1e-6)
+            for k, idx in enumerate(scored_idx):
+                ws[idx] = float(w_pred[k]) * scale
         try:
             with torch.no_grad():
                 fused = window_pgo(torch.from_numpy(np.stack(zs)).float(), edges,
@@ -172,7 +272,6 @@ def _load_frames(spec: SequenceSpec, size: int):
 
 
 def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG001 (deterministic; seed unused)
-    import cv2
     from PIL import Image
 
     size = 224 if spec.image_size > 448 else spec.image_size    # working resolution (PnP is stable at 224)
@@ -190,56 +289,18 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG
     depths = [ds._load_depth(f[1]) for f in frames]             # SENSOR depth, metric metres, 0 = invalid
     rgbs_u8 = [(r * 255).astype(np.uint8) for r in rgbs]
 
-    # correspondence front-end: DISK + LightGlue learned matcher (probe I1: +13-27% ATE on 4/5 scenes, far more
-    # inliers on hard/blurred frames) with classical SIFT as the CPU / no-GPU / no-weights fallback.
-    from .learned_match import build_matcher
-    matcher = build_matcher(rgbs_u8)
-    if matcher is None:
-        sift = cv2.SIFT_create(nfeatures=1200)
-        bf = cv2.BFMatcher(cv2.NORM_L2)
-        feats = [sift.detectAndCompute(cv2.cvtColor(u8, cv2.COLOR_RGB2GRAY), None) for u8 in rgbs_u8]
-
-    def _sift_match(i: int, j: int):
-        (ki, di), (kj, dj) = feats[i], feats[j]
-        if di is None or dj is None or len(ki) < _MIN_MATCHES or len(kj) < _MIN_MATCHES:
-            return None, None
-        good = [m for m, nn in bf.knnMatch(di, dj, k=2) if m.distance < 0.75 * nn.distance]
-        if len(good) < _MIN_MATCHES:
-            return None, None
-        return (np.float32([ki[m.queryIdx].pt for m in good]),
-                np.float32([kj[m.trainIdx].pt for m in good]))
-
-    def rel_pose(i: int, j: int) -> tuple[np.ndarray, int] | None:
-        """Relative pose (frame j expressed in frame i) via the learned/SIFT correspondences + sensor-depth PnP
-        RANSAC, plus the inlier count (used as the edge confidence for the windowed fusion)."""
-        uv_i, uv_j = matcher.match(i, j) if matcher is not None else _sift_match(i, j)
-        if uv_i is None or len(uv_i) < _MIN_MATCHES:
-            return None
-        d = depths[i]
-        u = np.clip(uv_i[:, 0].round().astype(int), 0, d.shape[1] - 1)
-        v = np.clip(uv_i[:, 1].round().astype(int), 0, d.shape[0] - 1)
-        z = d[v, u]
-        ok = _depth_ok(uv_i, d)                                 # valid depth + the depth-edge guard (with fallback)
-        if ok.sum() < _MIN_INLIERS:
-            return None
-        p3d = np.stack([(uv_i[:, 0] - K[0, 2]) / K[0, 0] * z,
-                        (uv_i[:, 1] - K[1, 2]) / K[1, 1] * z, z], 1).astype(np.float32)
-        found, rvec, tvec, inl = cv2.solvePnPRansac(p3d[ok], uv_j[ok], K, None, reprojectionError=3.0,
-                                                    iterationsCount=200, confidence=0.999)
-        if not found or inl is None or len(inl) < _MIN_INLIERS:
-            return None
-        R, _ = cv2.Rodrigues(rvec)
-        T = np.eye(4)
-        T[:3, :3] = R
-        T[:3, 3] = tvec[:, 0]                                   # cam_i -> cam_j
-        rel = np.linalg.inv(T)                                  # cam_j in cam_i, like the model's rel_pose
-        return (rel, int(len(inl))) if np.isfinite(rel).all() else None
+    rel_pose = make_rel_pose(rgbs_u8, depths, K, size)
 
     # trajectory: windowed pose-graph fusion over the metric PnP edges (consecutive + skip), the M-C solve
     # (window_pgo) run forward-only. On these STRONG metric edges the fusion measurably cuts drift (7-26% across
     # the validation scenes: office 0.097 -> 0.085, desk 0.036 -> 0.034, pioneer 0.033 -> 0.024 m), unlike over
     # weak edges where it fails (the P0.1 finding). Falls back to the plain chain if torch is unavailable.
-    c2ws, fallbacks = _trajectory(rel_pose, n)
+    # E4 (opt-in): a loaded edge scorer replaces the inlier-count weights inside the fusion.
+    from .edge_scorer import load_scorer
+    scorer = load_scorer()
+    if scorer is not None:
+        print(f"  [rgbd-sensor] E4 edge scorer active (alpha={scorer.alpha:.3f})")
+    c2ws, fallbacks = _trajectory(rel_pose, n, scorer)
 
     poses = [c2w[:3, :4].reshape(-1).astype(np.float32) for c2w in c2ws]
     centers = [c2w[:3, 3].astype(np.float32) for c2w in c2ws]
