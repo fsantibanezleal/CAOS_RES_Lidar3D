@@ -60,7 +60,9 @@ def test_relpose_error_geometry():
 
 
 def test_weight_mapping_monotone():
-    import torch
+    import pytest
+
+    torch = pytest.importorskip("torch")  # the CI test lane is torch-less by design (engine is torch-optional)
 
     net = build_net()
     torch.manual_seed(0)
