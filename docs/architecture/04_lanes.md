@@ -7,7 +7,7 @@ weighs on the active ones.
 
 ```
    +-----------------------------+        +---------------------------+        +--------------------------+
-   |  OFFLINE / precompute       |        |  REPLAY  (public default) |        |  LIVE  (dormant)         |
+   |  offline / precompute       |        |  REPLAY  (public default) |        |  LIVE  (dormant)         |
    |  data-pipeline/lidar3dlab   |  bake  |  frontend/  static SPA    |  ---   |  app/  FastAPI local-GPU |
    |  local GPU + checkpoint     | -----> |  GitHub Pages             |        |  real-time streaming     |
    |  requirements.txt (torch,   |  data/ |  no deps at request time  |        |  requirements-api.txt    |
@@ -16,7 +16,7 @@ weighs on the active ones.
         writes committed artifacts             reads committed artifacts           (only on a GPU host)
 ```
 
-## Lane A: OFFLINE / precompute (active)
+## Lane A: offline / precompute (active)
 
 This is where the real reconstruction happens. It runs the `lidar3dlab` package in a local Python 3.12
 `.venv` on a machine with a CUDA GPU, and it bakes the committed artifacts under `data/derived/`.
