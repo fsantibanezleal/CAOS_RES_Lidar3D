@@ -25,7 +25,7 @@ These are metric (in metres) because the camera engine's scale is fixed by the a
 (`s = mean L2 norm of the anchor cloud`), so `path_length_m` and `bbox_extent_m` are meaningful physical
 quantities, not arbitrary units.
 
-## What we do NOT claim: no faked ATE/RPE
+## What we do not claim: no faked ATE/RPE
 
 Absolute Trajectory Error (ATE) and Relative Pose Error (RPE) are the standard SLAM accuracy metrics, and they
 require **ground-truth poses**. The bundled example sequences (`oxford`, `university`, `loop`, `courthouse`)

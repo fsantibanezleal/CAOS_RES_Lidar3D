@@ -4,7 +4,7 @@ The lab's models now form two explicit tracks, set by the product decision that 
 
 | Track | Input | Metric scale | Engines | Where it stands |
 |---|---|---|---|---|
-| **A: RGB-only** | one ordinary camera | must be inferred (the hard part) | Estela (ours, trained), lingbot-map (SOTA pointmap reference) | Estela 0.28 m deployed; the measured ceiling is ~0.02 m, blocked ONLY by monocular metric scale |
+| **A: RGB-only** | one ordinary camera | must be inferred (the hard part) | Estela (ours, trained), lingbot-map (SOTA pointmap reference) | Estela 0.28 m deployed; the measured ceiling is ~0.02 m, blocked only by monocular metric scale |
 | **B: RGB + depth sensor** | camera + Kinect/LiDAR-class depth | measured by the sensor (free) | `rgbd-sensor` (this page) | 0.034-0.098 m across TUM scenes, no scale ambiguity |
 
 Code: `data-pipeline/lidar3dlab/model/rgbd_engine.py`, registered as `rgbd-sensor` in the model-agnostic registry.
@@ -13,7 +13,7 @@ Code: `data-pipeline/lidar3dlab/model/rgbd_engine.py`, registered as `rgbd-senso
 
 The whole 2026-07-04 experiment campaign (see [model history](02_model-history.md) and the improvement action plan
 in the management repo) converged on one fact: with a good metric depth, a classical geometric pose is
-~10x better than the deployed RGB-only trajectory, and the ONLY blocker in RGB-only mode is the absolute metric
+~10x better than the deployed RGB-only trajectory, and the only blocker in RGB-only mode is the absolute metric
 scale, which monocular vision fundamentally cannot observe (jerk and reprojection objectives are degenerate in
 scale; a learned model's scale prior drifts per scene). A depth sensor measures that scale directly. Track B is
 therefore not a luxury: it is the configuration where the measured ~10x ceiling is reachable TODAY.
@@ -54,7 +54,7 @@ plain chain it looked decisive: +13 to +27% ATE on 4/5 scenes with 2-3x more inl
 matches on motion-blurred frames). But measured end-to-end through the ACTUAL deployed pipeline (window fusion +
 the depth-edge guard), the advantage collapses: the fusion already absorbs most drift, and the guard removes
 exactly the noisier, more-distributed matches the learned matcher added, so SIFT beats LightGlue on 3/5 scenes
-(`office` 0.038 vs 0.049, `pioneer` 0.040 vs 0.052, `desk2` 0.014 vs 0.021). It is therefore NOT the default. It
+(`office` 0.038 vs 0.049, `pioneer` 0.040 vs 0.052, `desk2` 0.014 vs 0.021). It is therefore not the default. It
 stays available (`LIDAR3D_MATCHER=lightglue`) because its much higher inlier count is a genuine robustness asset on
 hard or blurred imagery, which the clean TUM benchmark does not reward. The lesson is the standing one: measure the
 real deployed pipeline, not an isolated probe: the probe said "ship the learned matcher", the deployment said "the
@@ -77,12 +77,12 @@ plain consecutive chain, then with the windowed pose-graph fusion (the shipped c
 Zero fallback pairs on all three. This is also the first PRODUCTION use of the M-C differentiable windowed
 pose-graph: it fails over weak monocular edges (the P0.1 finding) but pays off over these strong metric edges,
 exactly as its synthetic self-test predicted. The residual error on `long_office` at range reflects Kinect depth
-noise and holes; a confidence-weighted fusion of sensor depth with a foundation model's depth SHAPE (Depth
+noise and holes; a confidence-weighted fusion of sensor depth with a foundation model's depth shape (Depth
 Anything V2) is the tracked refinement.
 
 ## The cases
 
-`RGBD_tum_office` and `RGBD_tum_desk` bake the SAME scenes as `OWN_tum_office` / `OWN_tum_desk`, so the App shows
+`RGBD_tum_office` and `RGBD_tum_desk` bake the same scenes as `OWN_tum_office` / `OWN_tum_desk`, so the App shows
 an honest side-by-side: same frames, same intrinsics, RGB-only vs RGB+depth. The per-frame panel shows the real
 sensor depth (with its holes) next to the RGB stream.
 

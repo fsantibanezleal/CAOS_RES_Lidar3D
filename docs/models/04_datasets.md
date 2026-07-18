@@ -1,6 +1,6 @@
 # Datasets (model data)
 
-The data behind OUR depth+pose model: what trains it, what it reconstructs, the formats, the real intrinsics, and the
+The data behind our depth+pose model: what trains it, what it reconstructs, the formats, the real intrinsics, and the
 licenses. Everything lives under `LIDAR3D_DATA_ROOT/train/` (never a machine path in the repo); raw data stays off-git,
 only compact derived artifacts are committed.
 
@@ -60,7 +60,7 @@ Each deployed case shows its dataset + license in the App's reconstruction stats
 
 The classic benchmarks above are small. The real lever is more, broader data **paired with more model capacity**
 (a frozen DINOv2 backbone; see [models/01](01_own-depth-pose.md)) — note that adding TUM 5→11 sequences alone did
-NOT help the tiny model (it saturated). Candidate bigger sets, with their real download friction (verified):
+not help the tiny model (it saturated). Candidate bigger sets, with their real download friction (verified):
 
 - **TartanAir** — huge synthetic VO/SLAM set with perfect depth + pose; the best fit. BUT: no pip package, the Azure
   blob container is not publicly listable, and the main HuggingFace mirror is **gated (manual approval)**. Needs

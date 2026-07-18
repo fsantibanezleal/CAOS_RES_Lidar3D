@@ -136,8 +136,8 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
         </div>
         <p className="hint">{
           curScene?.inputs === 'rgb+depth' ? (es(lang)
-            ? 'Este escenario trae RGB y profundidad de sensor: aplica Track A (usa SOLO el RGB; la escala se infiere, 0.28 m clase), Track B (RGB + profundidad Kinect; la escala la mide el sensor, 0.024-0.085 m), o el ICP clásico solo-profundidad (sin RGB en la pose; la línea base con la que ambos tracks se comparan).'
-            : 'This scenario carries RGB and sensor depth: apply Track A (uses ONLY the RGB; scale is inferred, 0.28 m class), Track B (RGB + Kinect depth; scale is measured by the sensor, 0.024-0.085 m), or classical depth-only ICP (no RGB in the pose; the baseline both tracks are compared against).')
+            ? 'Este escenario trae RGB y profundidad de sensor: aplica Track A (usa solo el RGB; la escala se infiere, 0.28 m clase), Track B (RGB + profundidad Kinect; la escala la mide el sensor, 0.024-0.085 m), o el ICP clásico solo-profundidad (sin RGB en la pose; la línea base con la que ambos tracks se comparan).'
+            : 'This scenario carries RGB and sensor depth: apply Track A (uses only the RGB; scale is inferred, 0.28 m class), Track B (RGB + Kinect depth; scale is measured by the sensor, 0.024-0.085 m), or classical depth-only ICP (no RGB in the pose; the baseline both tracks are compared against).')
           : curScene?.inputs === 'rgb' ? (es(lang)
             ? 'Este escenario trae solo video RGB: aplica Track A (la escala debe inferirse). Track B no es aplicable sin un sensor de profundidad.'
             : 'This scenario carries RGB video only: Track A applies (scale must be inferred). Track B is not applicable without a depth sensor.')
@@ -182,7 +182,7 @@ export function AppPage({ lang, dark }: { lang: Lang; dark: boolean }) {
 
         <label className="lab">{es(lang) ? 'Densidad de puntos' : 'Point density'}</label>
         <input type="range" min={1} max={5} step={1} value={detail} onChange={(e) => setDetail(+e.target.value)} />
-        <p className="hint">{es(lang) ? 'Densidad completa por defecto; bájala si tu equipo pierde fluidez' : 'Full density by default; lower it if your machine loses fluidity'}</p>
+        <p className="hint">{es(lang) ? 'Densidad completa por defecto; reducir si el equipo pierde fluidez' : 'Full density by default; lower it if the machine loses fluidity'}</p>
 
         <label className="lab">Color</label>
         <div className="chips">

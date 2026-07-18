@@ -68,13 +68,13 @@ export function LanesDiagram({ lang }: { lang: Lang }) {
         <Arrow x1={133} y1={266} x2={133} y2={282} accent />
         <Box x={40} y={284} w={186} h={44} title="evaluate · export" sub="ATE / RPE · trace.json" accent={C.acc} />
 
-        <Box x={286} y={150} w={178} h={64} title={en ? 'committed artifact' : 'artefacto commiteado'} sub="trace.json + manifest (CONTRACT 2)" accent={C.acc2} />
+        <Box x={286} y={150} w={178} h={64} title={en ? 'committed artifact' : 'artefacto confirmado'} sub="trace.json + manifest (CONTRACT 2)" accent={C.acc2} />
         <Box x={286} y={244} w={178} h={64} title={en ? 'three.js replay' : 'replay three.js'} sub={en ? 'point cloud + trajectory' : 'nube + trayectoria'} accent={C.acc2} />
         <Arrow x1={286} y1={306} x2={236} y2={306} />{/* from export to replay */}
         <path d={`M226 306 H270 V182 H286`} fill="none" stroke={C.acc} strokeWidth="1.5" markerEnd="url(#ahA)" />
         <Arrow x1={375} y1={214} x2={375} y2={244} accent />
 
-        <Box x={508} y={150} w={188} h={44} title={en ? 'your footage' : 'tu video'} sub={en ? 'browser upload' : 'subida en browser'} dashed accent={C.mut} />
+        <Box x={508} y={150} w={188} h={44} title={en ? 'custom footage' : 'video propio'} sub={en ? 'browser upload' : 'subida en browser'} dashed accent={C.mut} />
         <Arrow x1={602} y1={194} x2={602} y2={210} dashed />
         <Box x={508} y={212} w={188} h={52} title="FastAPI + GPU" sub={en ? '4.6 GB checkpoint · 1B ViT' : 'checkpoint 4.6 GB · ViT 1B'} dashed accent={C.mut} />
         <Arrow x1={602} y1={264} x2={602} y2={280} dashed />
@@ -121,7 +121,7 @@ export function DesignFlowDiagram({ lang }: { lang: Lang }) {
     [en ? 'research / fiche' : 'research / ficha', 'wip/lidar3d + surveys'],
     [en ? 'implement' : 'implementar', 'data-pipeline/lidar3dlab'],
     [en ? 'train + validate' : 'entrenar + validar', 'train/ · geom test · ATE'],
-    [en ? 'bake artifact' : 'hornear artefacto', 'stages/export · trace.json'],
+    [en ? 'bake artifact' : 'precalcular artefacto', 'stages/export · trace.json'],
     [en ? 'build SPA' : 'build SPA', 'frontend/ · copy-data'],
     [en ? 'deploy' : 'desplegar', 'Pages · fasl-work.com'],
   ];
@@ -135,7 +135,7 @@ export function DesignFlowDiagram({ lang }: { lang: Lang }) {
           return <g key={i}><Box x={x} y={110} w={104} h={54} title={t} sub={s} accent={i === 2 ? C.acc : undefined} />
             {i < steps.length - 1 && <Arrow x1={x + 104} y1={137} x2={x + 116} y2={137} accent />}</g>;
         })}
-        <text x={360} y={196} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'the design-build flow (research to deploy); the App you see is the replay of a committed artifact' : 'el flujo de diseño-construcción (research a deploy); la App que ves es el replay de un artefacto commiteado'}</text>
+        <text x={360} y={196} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'the design-build flow (research to deploy); the App shown is the replay of a committed artifact' : 'el flujo de diseño-construcción (research a deploy); la App mostrada es el replay de un artefacto confirmado'}</text>
       </>
     </Frame>
   );
@@ -161,7 +161,7 @@ export function WebAppFlowDiagram({ lang }: { lang: Lang }) {
         <Arrow x1={476} y1={170} x2={496} y2={170} />
         <Box x={496} y={140} w={208} h={60} title={en ? '6 pages (ADR-0016)' : '6 páginas (ADR-0016)'} sub={en ? 'App + 5 deep tabbed texts + ⓘ modal' : 'App + 5 textos tabulados + modal ⓘ'} />
         <path d="M120 94 V140" stroke={C.acc} strokeWidth="1.5" markerEnd="url(#ahA)" />
-        <text x={360} y={238} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'static SPA: it only replays committed artifacts, it never recomputes in the browser' : 'SPA estática: solo reproduce artefactos commiteados, nunca recomputa en el browser'}</text>
+        <text x={360} y={238} textAnchor="middle" fontSize="10.5" fill={C.mut}>{en ? 'static SPA: it only replays committed artifacts, it never recomputes in the browser' : 'SPA estática: solo reproduce artefactos confirmados, nunca recomputa en el browser'}</text>
       </>
     </Frame>
   );
@@ -173,7 +173,7 @@ export function DataContractsDiagram({ lang }: { lang: Lang }) {
   return (
     <Frame h={280} vb="0 0 720 280">
       <><Defs />
-        <Lane x={8} y={26} w={340} h={230} label={en ? 'CONTRACT 1 · ingestion (bring-your-own-data)' : 'CONTRATO 1 · ingesta (trae-tus-datos)'} color={C.acc2} />
+        <Lane x={8} y={26} w={340} h={230} label={en ? 'CONTRACT 1 · ingestion (bring-your-own-data)' : 'CONTRATO 1 · ingesta (datos propios)'} color={C.acc2} />
         <Lane x={360} y={26} w={352} h={230} label={en ? 'CONTRACT 2 · artifact (pipeline to web)' : 'CONTRATO 2 · artefacto (pipeline a web)'} color={C.acc} />
         <Box x={28} y={54} w={300} h={40} title={en ? 'RGB / LiDAR sequence + knobs' : 'Secuencia RGB / LiDAR + knobs'} sub="io/schema.py SequenceSpec" />
         <Arrow x1={178} y1={94} x2={178} y2={110} />

@@ -1,6 +1,6 @@
-# Guide: train and run OUR own depth+pose model (local)
+# Guide: train and run our own depth+pose model (local)
 
-The complete local workflow for the OWN model: train it on the GPU, bake a scene, tune the pose-refinement ladder,
+The complete local workflow for the own model: train it on the GPU, bake a scene, tune the pose-refinement ladder,
 add a new scene, and verify. Everything runs locally; only compact artifacts are committed (weights stay off-git).
 
 ## 0. One-time setup

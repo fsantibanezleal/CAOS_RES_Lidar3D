@@ -118,7 +118,7 @@ evaluated on the held-out TUM `long_office` (the same sequence the deployed per-
 | per-edge error | 0.204 m | (same measurements) | (Siamese + ICP front-end) |
 
 - **The windowed solve reduces drift, as designed.** The joint `window_pgo` fusion cuts per-window drift 45% vs
-  chaining the SAME measurements on `long_office` (0.254 m vs 0.464 m) and 18% on the TartanGround val
+  chaining the same measurements on `long_office` (0.254 m vs 0.464 m) and 18% on the TartanGround val
   (0.583 m vs 0.707 m), and halves the full-trajectory ATE (3.16 m vs 6.01 m). The mechanism works on real data,
   matching the synthetic self-test (0.0775 m to 0.0304 m, 61% less; `tests/test_window_ba.py`). The pivot is stable:
   per-edge error falls from about 3 m (untrained) to about 0.20 m with no NaN.
@@ -127,7 +127,7 @@ evaluated on the held-out TUM `long_office` (the same sequence the deployed per-
   absolute ATE (3.16 m) is an order of magnitude above M8, which uses the stronger Siamese pose head plus ICP
   refinement. The fusion helps; the front-end is the ceiling.
 - **The honest read:** windowed bundle adjustment is validated as a drift reducer, but to beat M8 it must fuse
-  BETTER per-edge measurements. The clear next step is to feed the solver the Siamese head's edges (or ICP-refined
+  better per-edge measurements. The clear next step is to feed the solver the Siamese head's edges (or ICP-refined
   edges) instead of the geometric head's, then re-run the same comparison. This is the finding, recorded in
   [the model history](02_model-history.md) and the [experiments log](03_experiments-log.md).
 
