@@ -47,4 +47,4 @@ python -m lidar3dlab.train.train_depthpose --backbone resnet18 --use_icl \
 ```
 
 The best checkpoint lands at `LIDAR3D_MODELS_ROOT/own-depthpose/own-depthpose-resnet18.pt` (archive) and
-`own-depthpose.pt` (canonical, loaded by the engine). Then re-bake the OUR case and compare before deploying.
+`own-depthpose.pt` (canonical, loaded by the engine). Then re-bake our case and compare before deploying.

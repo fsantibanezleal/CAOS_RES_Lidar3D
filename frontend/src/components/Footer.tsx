@@ -14,7 +14,7 @@ export function Footer({ lang }: { lang: Lang }) {
       <span>·</span>
       <span>{en
         ? 'Replay of committed artifacts; live reconstruction runs on a local GPU.'
-        : 'Replay de artefactos commiteados; la reconstrucción en vivo corre en GPU local.'}</span>
+        : 'Replay de artefactos confirmados; la reconstrucción en vivo se ejecuta en GPU local.'}</span>
     </footer>
   );
 }

@@ -37,9 +37,9 @@ export function Introduction({ lang }: { lang: Lang }) {
     <>
       <h3>{en ? 'Three lanes (ADR-0057)' : 'Tres lanes (ADR-0057)'}</h3>
       <p>{en
-        ? 'Because the model is a roughly 1B-parameter ViT that needs a GPU, it is not browser-feasible. The lab therefore separates three lanes: an offline lane that bakes committed artifacts on a GPU, a REPLAY lane (this static web) that renders those artifacts, and a dormant LIVE lane (a local-GPU API) for real-time reconstruction of your own footage. The App page you open here is the replay lane, and it can play the reconstruction building up frame by frame.'
-        : 'Como el modelo es un ViT de aproximadamente 1B parámetros que necesita GPU, no es viable en el browser. El lab separa tres lanes: uno offline que hornea artefactos commiteados en GPU, uno REPLAY (esta web estática) que los renderiza, y uno LIVE dormido (una API GPU local) para reconstrucción en vivo de tu propio video. La App que abres aquí es el lane replay, y puede reproducir la reconstrucción construyéndose cuadro a cuadro.'}</p>
-      <p className="muted">{en ? 'Open the ⓘ Architecture button in the header for the full themed diagram of the three lanes and the data flow.' : 'Abre el botón ⓘ Arquitectura en el header para el diagrama temado completo de los tres lanes y el flujo de datos.'}</p>
+        ? 'Because the model is a roughly 1B-parameter ViT that needs a GPU, it is not browser-feasible. The lab therefore separates three lanes: an offline lane that precomputes committed artifacts on a GPU, a replay lane (this static web) that renders those artifacts, and a dormant live lane (a local-GPU API) for real-time reconstruction of custom footage. The App page shown here is the replay lane, and it can play the reconstruction building up frame by frame.'
+        : 'Como el modelo es un ViT de aproximadamente 1B parámetros que necesita GPU, no es viable en el browser. El lab separa tres lanes: uno offline que precalcula artefactos confirmados en GPU, uno replay (esta web estática) que los renderiza, y uno live dormido (una API GPU local) para reconstrucción en vivo de video propio. La App que se abre aquí es el lane replay, y puede reproducir la reconstrucción construyéndose cuadro a cuadro.'}</p>
+      <p className="muted">{en ? 'Open the ⓘ Architecture button in the header for the full themed diagram of the three lanes and the data flow.' : 'Abrir el botón ⓘ Arquitectura en el header para el diagrama completo, adaptado al tema, de los tres lanes y el flujo de datos.'}</p>
     </>
   );
 
