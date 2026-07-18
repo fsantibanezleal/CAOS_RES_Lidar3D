@@ -1,0 +1,10 @@
+{
+  "train_edges": 2112,
+  "val_edges": 423,
+  "val_seq": "structure_texture_far",
+  "spearman_val": 0.1551051399572426,
+  "spearman_train": 0.6468732784021219,
+  "spearman_neg_inliers_baseline": 0.047700949325946235,
+  "alpha": 59.69809341430664,
+  "seed": 4
+}

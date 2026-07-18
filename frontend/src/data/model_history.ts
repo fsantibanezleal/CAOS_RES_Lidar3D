@@ -36,7 +36,7 @@ export const MODEL_HISTORY: ModelRun[] = [
     id: 'M4', run: 'early-stopping retrain (v0.09.004)', backbone: 'scratch', data: 'TUM RGB-D',
     ate: '0.29', deployed: 'live',
     notes_en: 'added best-checkpoint early stopping; re-baked the OUR case (coherent per-frame depth). This baked artifact is what the site currently serves.',
-    notes_es: 'agregó early-stopping por mejor checkpoint; re-horneó el caso OUR (depth por cuadro coherente). Este artefacto horneado es el que el sitio sirve hoy.',
+    notes_es: 'agregó early-stopping por mejor checkpoint; re-horneó el caso OUR (depth por cuadro coherente). Este artefacto precalculado es el que el sitio sirve hoy.',
   },
   {
     id: 'M5', run: 'extra-losses experiment (v0.10.x)', backbone: 'scratch', data: 'TUM RGB-D',
@@ -48,7 +48,7 @@ export const MODEL_HISTORY: ModelRun[] = [
     id: 'M6', run: 'simple retrain + conf 0.6', backbone: 'scratch', data: 'TUM RGB-D',
     ate: '0.4344', deployed: 'no',
     notes_en: 'run-to-run instability landed worse than M4; re-baked OUR with conf 0.6 (54,665 pts) but 0.43 m pose was still diffuse, so reverted to keep M4 live. Its baked artifact is preserved in git.',
-    notes_es: 'la inestabilidad entre corridas quedó peor que M4; re-horneó OUR con conf 0.6 (54.665 pts) pero la pose de 0.43 m seguía difusa, así que se revirtió para mantener M4 en vivo. Su artefacto horneado está preservado en git.',
+    notes_es: 'la inestabilidad entre corridas quedó peor que M4; re-horneó OUR con conf 0.6 (54.665 pts) pero la pose de 0.43 m seguía difusa, así que se revirtió para mantener M4 en vivo. Su artefacto precalculado está preservado en git.',
   },
   {
     id: 'M7', run: 'pretrained backbone + ICP (v0.11.000)', backbone: 'resnet18',

@@ -26,7 +26,7 @@ export const DICT: Record<string, { en: string; es: string }> = {
   expected: { en: 'Expected', es: 'Esperado' },
   replay_note: {
     en: 'Replaying a committed artifact (CONTRACT 2): a real reconstruction baked offline by the selected engine, not a live demo. For your own footage run the local-GPU API: uvicorn app.main:app, then POST /api/live/reconstruct (see the README).',
-    es: 'Reproduciendo un artefacto commiteado (CONTRACT 2): una reconstrucción real horneada offline por el motor seleccionado, no un demo en vivo. Para tu propio video corre la API GPU local: uvicorn app.main:app y POST /api/live/reconstruct (ver README).',
+    es: 'Reproduciendo un artefacto commiteado (CONTRACT 2): una reconstrucción real precalculada offline por el motor seleccionado, no un demo en vivo. Para tu propio video corre la API GPU local: uvicorn app.main:app y POST /api/live/reconstruct (ver README).',
   },
   close: { en: 'Close', es: 'Cerrar' },
 };
