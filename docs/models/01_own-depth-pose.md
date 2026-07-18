@@ -36,7 +36,7 @@ $$\hat D = D_{\max}\,\sigma(h_D), \qquad \log \hat\sigma^2 = \operatorname{clamp
 
 with $D_{\max} = 10\ \text{m}$. The per-pixel **confidence** used both to weight the loss and to filter the point
 cloud at inference is $c = e^{-\log \hat\sigma^2}$ (high = reliable). At inference we keep only pixels above a
-per-frame quantile of $c$ (the OUR case uses `conf_quantile = 0.6`, i.e. the top 40 % most confident pixels), which
+per-frame quantile of $c$ (our case uses `conf_quantile = 0.6`, i.e. the top 40 % most confident pixels), which
 sharpens the cloud; this is a genuine, useful feature of the learned confidence, not decoration.
 
 The depth is supervised with a heteroscedastic (aleatoric) negative log-likelihood over valid ground-truth pixels
@@ -105,7 +105,7 @@ feed-forward monocular reconstruction: the per-frame depth is excellent; the fus
 Model quality is reported as **Absolute Trajectory Error (ATE)**: run the model over a held-out sequence, accumulate
 the predicted camera trajectory, align it to ground truth with a similarity transform (Umeyama), and take the RMS
 position error in metres. It is a *trajectory* metric: a small per-pair pose error accumulates over the sequence, so
-ATE grows with sequence length. A short case (the OUR desk case reconstructs ~60 frames after decimation) drifts far
+ATE grows with sequence length. A short case (our desk case reconstructs ~60 frames after decimation) drifts far
 less than the ~300-frame held-out evaluation sequence, so the *look* of the reconstruction can be tighter than the
 reported ATE alone suggests. The diffuse-vs-sharp appearance is dominated by **pose drift**, which is why the pose
 head (and, in the pretrained variant, its steadier pose) matters as much as depth sharpness.

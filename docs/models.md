@@ -1,6 +1,6 @@
 # Models
 
-Our OWN, trainable, model-agnostic reconstruction stack, built around **Estela** (our depth+pose net), and the
+Our own, trainable, model-agnostic reconstruction stack, built around **Estela** (our depth+pose net), and the
 full honest record of every model and every experiment run in this lab. The engine is model-agnostic (a registry
 behind one `reconstruct(spec, seed) -> ReconResult` contract, `data-pipeline/lidar3dlab/model/agnostic.py`); this
 theme documents the models that plug into it and the history of training them, so no experiment or negative result

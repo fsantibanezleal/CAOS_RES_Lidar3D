@@ -16,7 +16,7 @@ knobs, and the real contracts. Heavy paths are referred to by the env-var names 
 | 05 | [Architecture modal (ADR-0058)](guides/05_architecture-modal.md) | what the in-app ⓘ "How it works" modal must show |
 | 06 | [Add an engine or a case](guides/06_add-an-engine-or-case.md) | add a new `model/` engine + a case-by-category; the modality dispatch |
 | 07 | [LiDAR modality](guides/07_lidar-modality.md) | bake LiDAR: synthetic + real `.bin`/`.npy`/`.ply`; the KISS-ICP swap |
-| 08 | [Train and run OUR model](guides/08_train-and-run-the-own-model.md) | the full local workflow: train the depth+pose net, bake, tune the ICP/D1/TSDF refinement ladder, add a scene, verify |
+| 08 | [Train and run our model](guides/08_train-and-run-the-own-model.md) | the full local workflow: train the depth+pose net, bake, tune the ICP/D1/TSDF refinement ladder, add a scene, verify |
 
 Related theory: the engine internals are in [`docs/theory/`](theory.md); the repo mechanics (contracts,
 determinism, gate, deploy) are in [`docs/architecture/`](architecture.md); the engine card is in
