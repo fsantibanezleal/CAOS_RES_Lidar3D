@@ -5,7 +5,7 @@ The lab's models now form two explicit tracks, set by the product decision that 
 | Track | Input | Metric scale | Engines | Where it stands |
 |---|---|---|---|---|
 | **A: RGB-only** | one ordinary camera | must be inferred (the hard part) | Estela (ours, trained), lingbot-map (SOTA pointmap reference) | Estela 0.28 m deployed; the measured ceiling is ~0.02 m, blocked only by monocular metric scale |
-| **B: RGB + depth sensor** | camera + Kinect/LiDAR-class depth | measured by the sensor (free) | `rgbd-sensor` (this page) | 0.034-0.098 m across TUM scenes, no scale ambiguity |
+| **B: RGB + depth sensor** | camera + Kinect/LiDAR-class depth | measured by the sensor (free) | `rgbd-sensor` (this page) | 0.014-0.040 m across the five TUM scenes, no scale ambiguity |
 
 Code: `data-pipeline/lidar3dlab/model/rgbd_engine.py`, registered as `rgbd-sensor` in the model-agnostic registry.
 
@@ -63,22 +63,34 @@ guard is the win, the matcher is a wash".
 If a pair has too few valid matches (rare: zero occurrences across the validation scenes), the pose HOLDS rather
 than inventing motion, and the event is counted.
 
-## Validation (2026-07-04, before the engine was written)
+## What the shipped pipeline measures (0.16.000, from the committed manifests)
 
-The method was validated standalone against ground truth before productization (umeyama ATE, metres), first as a
-plain consecutive chain, then with the windowed pose-graph fusion (the shipped configuration):
+Since 0.16.000 the evaluate stage computes ATE itself, so these numbers come out of
+`python -m lidar3dlab.pipeline <case>` and live in `data/derived/manifests/`. Rigid-aligned ATE (no scale
+fitted), 240 frames, the shipped configuration (depth-edge guard + windowed fusion + TSDF):
 
-| sequence | RGB-only Estela (deployed) | Track B chain | **Track B + window fusion (shipped)** |
+| case | ATE (m) | RPE translation (m) | RPE rotation (deg) |
 |---|---|---|---|
-| freiburg3_long_office (300) | 0.281 | 0.097 | **0.085** (-13%) |
-| freiburg1_desk (120) | 0.119 | 0.036 | **0.034** (-7%) |
-| freiburg2_pioneer (150) | 0.031 | 0.033 | **0.024** (-26%) |
+| `RGBD_tum_desk` | 0.0317 | 0.0091 | 0.561 |
+| `RGBD_tum_office` | 0.0380 | 0.0066 | 0.209 |
+| `RGBD_tum_desk2` | 0.0136 | 0.0025 | 0.249 |
+| `RGBD_tum_xyz` | 0.0237 | 0.0054 | 0.358 |
+| `RGBD_tum_pioneer` | 0.0396 | 0.0197 | 0.282 |
 
-Zero fallback pairs on all three. This is also the first PRODUCTION use of the M-C differentiable windowed
-pose-graph: it fails over weak monocular edges (the P0.1 finding) but pays off over these strong metric edges,
-exactly as its synthetic self-test predicted. The residual error on `long_office` at range reflects Kinect depth
-noise and holes; a confidence-weighted fusion of sensor depth with a foundation model's depth shape (Depth
-Anything V2) is the tracked refinement.
+### The earlier numbers, and why they are not these
+
+An earlier version of this page carried a validation table from 2026-07-04, measured standalone before the
+engine was productized, at 300/120/150 frames and before the depth-edge guard (I1) shipped in 0.14.000:
+long_office 0.085, desk 0.034, pioneer 0.024. Those were never re-measured under the shipped protocol, and
+three eras of Track B numbers ended up coexisting across this page, the case texts, the README and the
+frontend history. They are replaced above rather than kept alongside, because they are not reproducible from
+the committed pipeline: desk and long office improved once the guard shipped, and pioneer is WORSE under the
+shipped protocol (0.024 to 0.040), which no page said.
+
+The 2026-07-04 round remains the record of the METHOD comparison it was run for (a plain consecutive chain
+against the windowed pose-graph fusion, where fusion won on all three scenes). That was also the first
+production use of the M-C differentiable windowed pose-graph: it fails over weak monocular edges (the P0.1
+finding) and pays off over these strong metric edges, exactly as its synthetic self-test predicted.
 
 ## The cases
 
@@ -89,6 +101,7 @@ sensor depth (with its holes) next to the RGB stream.
 ## Honest limitations
 
 - Track B needs the depth stream: it applies to RGB-D/LiDAR captures, not to plain video. That is Track A's job.
-- The pose is frame-to-frame (no loop closure); on very long sequences drift will accumulate, and the windowed
-  fusion (Estela-W's `window_pgo`) over these strong metric edges is the natural extension.
+- The windowed pose-graph fusion over consecutive edges SHIPS (it is in the numbers above), but there is no
+  loop closure: on a long sequence that revisits a place, drift accumulates and nothing pulls it back. A
+  place-recognition edge into the same graph is the natural extension and is not built.
 - Kinect-class sensors fail on dark/specular/far surfaces; those regions are honestly missing from the cloud.
