@@ -55,3 +55,8 @@ class ReconResult:
     depth_thumbs: list[dict] = field(default_factory=list)  # per-frame {idx, png_b64} depth previews for the panel
     rgb_thumbs: list[dict] = field(default_factory=list)     # per-frame {idx, png_b64} RGB previews (camera cases)
     frame_offsets: list[int] = field(default_factory=list)   # cumulative kept-point count per frame (progressive replay)
+    #: Ground-truth camera-to-world per frame, [S,4,4], in the SAME order as `poses_c2w`, when the
+    #: sequence ships GT (TUM `groundtruth.txt`, ICL `*.gt.freiburg`). None when it does not. This
+    #: is what lets the evaluate stage report a real ATE instead of "no GT": ten of the registered
+    #: cases carry GT and every manifest used to claim none of them did.
+    gt_c2w: Any = None

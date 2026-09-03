@@ -33,6 +33,63 @@ def _frames(source_dir: str, max_frames: int, frame_glob: str = "") -> list[str]
     return sorted(paths, key=_natkey)[:max_frames]
 
 
+def _gt_for_frames(source_dir: str, paths: list[str], max_dt: float = 0.02):
+    """Ground-truth camera-to-world per frame for a TUM-layout folder, or None.
+
+    The RGB-only track reads a FOLDER of images rather than the TUM association index, so it never
+    carried ground truth and every OWN case reported "no GT" even where the sequence ships it.
+    TUM names each frame by its timestamp (`<seconds>.png`) and keeps `groundtruth.txt` one level
+    up, so the association is the same nearest-timestamp rule the training loader uses. A frame
+    with no GT sample within `max_dt` seconds is marked NaN rather than silently paired with a
+    distant sample, and the evaluate stage drops those rows and reports how many frames were
+    actually aligned. (Boundary frames are the normal case: on freiburg3_long_office the GT
+    recording starts 67 ms after the first image.)
+    """
+    from pathlib import Path
+
+    from scipy.spatial.transform import Rotation
+
+    gt_file = Path(source_dir).parent / "groundtruth.txt"
+    if not gt_file.exists():
+        return None
+    ts, poses = [], []
+    for line in gt_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        v = line.split()
+        if len(v) < 8:
+            continue
+        try:
+            t = float(v[0])
+            tx, ty, tz, qx, qy, qz, qw = (float(x) for x in v[1:8])
+        except ValueError:
+            continue
+        c2w = np.eye(4)
+        c2w[:3, :3] = Rotation.from_quat([qx, qy, qz, qw]).as_matrix()
+        c2w[:3, 3] = (tx, ty, tz)
+        ts.append(t)
+        poses.append(c2w)
+    if len(ts) < 4:
+        return None
+    ts_arr = np.asarray(ts)
+    out, matched = [], 0
+    for p in paths:
+        try:
+            stamp = float(Path(p).stem)
+        except ValueError:
+            return None                     # not a TUM-style timestamped frame name
+        i = int(np.argmin(np.abs(ts_arr - stamp)))
+        if abs(ts_arr[i] - stamp) > max_dt:
+            out.append(np.full((4, 4), np.nan))
+        else:
+            out.append(poses[i])
+            matched += 1
+    if matched < 4:
+        return None
+    return np.stack(out)
+
+
 def _rgb_png_b64(rgb01: np.ndarray) -> str:
     import base64
     import io
@@ -372,6 +429,7 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:
         pts = np.concatenate(all_p).astype(np.float32)
         cols = np.concatenate(all_c).astype(np.uint8)
     return ReconResult(
+        gt_c2w=_gt_for_frames(spec.source_dir, paths[: len(rgbs)]),
         case_id=spec.case_id, n_frames=len(rgbs), poses_c2w=np.asarray(poses, np.float32),
         points=pts, colors=cols, per_frame=per_frame,
         path_length=geom.trajectory_length(np.asarray(centers, np.float32)),
