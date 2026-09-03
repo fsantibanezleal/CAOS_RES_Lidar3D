@@ -3,6 +3,61 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.16.000] - 2026-09-03
+
+### Added
+- **The evaluate stage computes ATE and RPE.** Until now it returned `ate_m: null` and
+  `gt: "none"` for EVERY case, including the ten that carry TUM or ICL ground truth, so every
+  published trajectory number came from an out-of-band script and none of them was reproducible
+  from the committed pipeline. The engines that load a GT-bearing dataset now carry the
+  ground-truth poses through `ReconResult.gt_c2w` (the loaders already associated one per frame,
+  in the same order), and the stage reports a rigid-aligned ATE (no scale fitted, because every
+  engine here is metric by construction) plus the relative-pose error in metres and degrees.
+  Sequences without GT still report absence rather than a number. Cross-checked against the
+  out-of-band measurements it replaces: `RGBD_tum_desk` 0.0317 m and `RGBD_tum_office` 0.0380 m,
+  the same values the performance-investment measurements reported for the shipped guard protocol.
+- 6 tests for the metric itself: a perfect trajectory scores zero, an arbitrary rigid offset and
+  rotation of the whole run is aligned away, a bent (accumulating) path is not, RPE catches
+  per-step wobble that ATE hides, the rotation error reads in degrees, and too few aligned frames
+  is stated rather than computed.
+
+### Fixed
+- **Track B lost per-frame provenance after TSDF fusion**, so progressive replay showed spatially
+  arbitrary chunks on all five RGBD cases. `extract_point_cloud` emits points ordered by volume
+  unit, not in frame order, while the per-frame counts came from the raw accumulation the TSDF
+  replaced; the trace then split the cloud evenly on the assumption that points ARE in frame
+  order. The fused surface is now attributed to its nearest camera and sorted by it, the same way
+  the own-engine TSDF path already did.
+
+### Changed
+- **The published trajectory table is now the artifact, not prose.** Re-baked from the pipeline
+  with ATE on (240 frames, rigid alignment):
+
+| scenario | Track A (Estela) | Track B (RGB + sensor depth) | classical depth-only ICP |
+|---|---|---|---|
+| TUM desk | 0.0810 m | 0.0317 m | 0.0626 m |
+| TUM long office | 0.2550 m | 0.0380 m | 0.0406 m |
+| TUM wide desk loop | 0.1176 m | 0.0136 m | 0.0752 m |
+| TUM xyz calibration | 0.0251 m | 0.0237 m | 0.0202 m |
+| TUM robot SLAM run | 0.1339 m | 0.0396 m | 0.1279 m |
+
+  The classical column reproduces the previously published numbers (0.063 / 0.041 / 0.075 / 0.020
+  / 0.128). Track B is better than the published figures on desk and long office because those
+  were measured before the depth-edge guard (I1, 0.14.000) shipped; the table had never been
+  re-measured under the shipped protocol.
+
+### Documented (work that was merged without a record)
+- **The E4 pose-edge scorer** (merged 2026-07-11, module `model/edge_scorer.py`, env
+  `LIDAR3D_EDGE_SCORER`, `train/{edge_dataset,train_edge_scorer,eval_edge_scorer}.py`, 13 tests)
+  was never mentioned in this changelog, the README or the docs, so the running code was not the
+  documented code. It ships OPT-IN and OFF by default, and its verdict is negative: the scorer
+  ranked edge error better than the inlier heuristic in isolation (Spearman 0.155 against 0.048)
+  and still lost end to end, improving 2 of 5 held-out scenes against a pre-committed bar of 4 of
+  5, with a diagnosed regression on the depth-poor pioneer scene. It stays in the tree as a
+  measured negative and a reusable harness; nothing enables it.
+- Release tags v0.14.000 and v0.15.000 were pushed (their commits existed since 2026-07-09, so
+  the README version badge had been showing v0.13.008 for a 0.15.000 product).
+
 ## [0.15.000] · 2026-07-09
 
 ### Added

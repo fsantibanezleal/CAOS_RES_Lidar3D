@@ -335,12 +335,39 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG
         voxel = float(os.environ.get("LIDAR3D_RGBD_TSDF_VOXEL", "0.012"))
         fused = _fuse_tsdf_sensor(depths, rgbs, c2ws, K, max_d, voxel=voxel)
         if fused is not None:
-            pts, cols = fused
+            tp, tc = fused
+            # Re-attribute the fused surface to frames. `extract_point_cloud` emits points ordered
+            # by volume unit (spatially), not in frame order, and the per-frame counts above were
+            # taken from the RAW accumulation, so the trace's progressive replay revealed
+            # spatially arbitrary chunks on every Track B case. Assign each surface point to its
+            # nearest camera and sort by that, exactly as the own-engine TSDF path does.
+            try:
+                from scipy.spatial import cKDTree
+                near = cKDTree(np.asarray(centers, np.float32)).query(tp)[1]
+                order = np.argsort(near, kind="stable")
+                tp, tc = tp[order], tc[order]
+                counts = np.bincount(near[order], minlength=n)
+                for i in range(n):
+                    per_frame[i]["n_points"] = int(counts[i])
+            except Exception as e:  # noqa: BLE001 - provenance is a nicety; the cloud is the product
+                print(f"  [rgbd-sensor] TSDF frame attribution skipped ({e})")
+            pts, cols = tp.astype(np.float32), tc.astype(np.uint8)
             print(f"  [rgbd-sensor] TSDF fusion: {len(pts)} surface points")
 
     if fallbacks:
         print(f"  [rgbd-sensor] {fallbacks}/{n - 1} pairs had too few valid matches (pose held)")
+    # Ground truth for the evaluate stage: TUMPairs associates a GT pose with every frame it
+    # keeps, in this exact order, so the ATE needs no re-association.
+    gt_c2w = None
+    try:
+        gt_stack = np.stack([np.asarray(f[2], np.float64) for f in frames])
+        if gt_stack.shape[1:] == (4, 4):
+            gt_c2w = gt_stack
+    except Exception:  # noqa: BLE001 - a sequence without GT simply reports none
+        gt_c2w = None
+
     return ReconResult(
+        gt_c2w=gt_c2w,
         case_id=spec.case_id, n_frames=n, poses_c2w=np.asarray(poses, np.float32),
         points=pts, colors=cols, per_frame=per_frame,
         path_length=trajectory_length(np.asarray(centers, np.float32)),

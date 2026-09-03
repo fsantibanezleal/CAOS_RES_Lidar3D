@@ -79,7 +79,18 @@ def reconstruct(spec: SequenceSpec, seed: int = 42) -> ReconResult:  # noqa: ARG
             rth.append({"idx": i, "png_b64": rgb_to_png_b64(rgbs[i])})
     pts = np.concatenate(all_p).astype(np.float32)
     cols = np.concatenate(all_c).astype(np.uint8)
+    # Ground truth for the evaluate stage: TUMPairs associates a GT pose with every frame it
+    # keeps, in this exact order, so the ATE needs no re-association.
+    gt_c2w = None
+    try:
+        gt_stack = np.stack([np.asarray(f[2], np.float64) for f in frames])
+        if gt_stack.shape[1:] == (4, 4):
+            gt_c2w = gt_stack
+    except Exception:  # noqa: BLE001 - a sequence without GT simply reports none
+        gt_c2w = None
+
     return ReconResult(
+        gt_c2w=gt_c2w,
         case_id=spec.case_id, n_frames=n, poses_c2w=np.asarray(poses, np.float32),
         points=pts, colors=cols, per_frame=per_frame,
         path_length=trajectory_length(np.asarray(centers, np.float32)),

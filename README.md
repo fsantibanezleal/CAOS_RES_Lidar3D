@@ -14,18 +14,26 @@
 ![Lidar 3D workbench](docs/assets/workbench.png)
 
 Research repo: local-first, heavy models/data on a scratch volume (env-resolved, never in git).
-**Status: v0.13.006 (live).** The App is organized **scenario-first**: pick the input data (RGB + depth /
+**Status: v0.16.000 (live).** The App is organized **scenario-first**: pick the input data (RGB + depth /
 RGB only / LiDAR only), then apply every method that data supports and compare the outcomes on the same
 frames. Two model tracks plus the classical baseline, all measured against ground truth (umeyama rigid ATE,
 240 frames):
 
 | scenario | Track A: RGB-only (Estela) | Track B: RGB + sensor depth | classical depth-only ICP |
 |---|---|---|---|
-| TUM desk | 0.137 m | **0.041 m** | 0.063 m |
-| TUM long office (held-out) | 0.198 m | 0.077 m | **0.041 m** |
-| TUM wide desk loop | 0.119 m | **0.016 m** | 0.075 m |
-| TUM xyz calibration | 0.184 m | 0.025 m | **0.020 m** |
-| TUM robot SLAM run | 0.115 m | **0.039 m** | 0.128 m |
+| TUM desk | 0.081 m | **0.032 m** | 0.063 m |
+| TUM long office (held-out) | 0.255 m | **0.038 m** | 0.041 m |
+| TUM wide desk loop | 0.118 m | **0.014 m** | 0.075 m |
+| TUM xyz calibration | 0.025 m | 0.024 m | **0.020 m** |
+| TUM robot SLAM run | 0.134 m | **0.040 m** | 0.128 m |
+
+Since 0.16.000 these numbers are computed BY the pipeline (the evaluate stage) and live in the committed
+manifests, so `python -m lidar3dlab.pipeline RGBD_tum_desk` reproduces them. Before that the stage reported
+"no ground truth" for every case, including the ten that carry it, and the published figures came from
+out-of-band scripts under earlier protocols; they differ from these in both directions (Track B improved on
+desk and long office once the depth-edge guard shipped in 0.14.000, Track A is better on desk and xyz and
+worse on long office and the robot run). The older numbers are not reproducible, which is why they are
+gone rather than kept alongside.
 
 No method dominates: sparse RGB features + PnP (Track B) win where texture is strong; dense depth ICP
 absorbs sensor noise at range; RGB-only carries the monocular scale ambiguity (the measured blocker, see

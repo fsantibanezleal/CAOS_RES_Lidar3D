@@ -104,7 +104,8 @@ CASES: list[Case] = [
          dataset="lingbot-map examples", license="Apache-2.0 (lingbot-map)"),
     # ---- Track B: RGB + REAL SENSOR DEPTH (rgbd-sensor engine). The RGB-only cases above are Track A; these
     # integrate the Kinect depth stream, so the metric scale comes from the SENSOR (no monocular ambiguity) and the
-    # trajectory is ~3x tighter than the RGB-only Estela on the same scenes (0.034-0.098 m validated vs 0.03-0.28).
+    # trajectory is 2 to 7x tighter than the RGB-only Estela on the same scenes (0.014-0.040 m against
+    # 0.025-0.255, both measured BY the pipeline since 0.16.000 and living in the case manifests).
     # Same scenes as OWN_tum_office/desk so the site shows an honest side-by-side of what the depth sensor buys. ----
     Case("RGBD_tum_office", "track B: RGB + sensor depth (Kinect)",
          SequenceSpec("RGBD_tum_office",
@@ -112,7 +113,8 @@ CASES: list[Case] = [
                       n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
                       intrinsics=_TUM3, max_render_depth=6.0),
          "the SAME office sweep as OWN_tum_office, but integrating the real Kinect depth: SIFT+PnP geometric pose "
-         "on sensor depth (metric by construction, 0.098 m ATE vs 0.28 m RGB-only), sensor holes stay honest holes",
+         "on sensor depth (metric by construction, 0.038 m ATE against 0.255 m RGB-only), sensor holes stay "
+         "honest holes",
          "real", dataset="TUM RGB-D (freiburg3_long_office_household, Sturm et al. 2012)",
          license="CC BY 4.0 (TUM RGB-D)"),
     Case("RGBD_tum_desk", "track B: RGB + sensor depth (Kinect)",
@@ -120,32 +122,32 @@ CASES: list[Case] = [
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_desk"),
                       n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
                       intrinsics=_TUM1, max_render_depth=5.0),
-         "the SAME desk sweep as OWN_tum_desk with the real Kinect depth integrated: 0.037 m ATE (vs 0.119 m "
-         "RGB-only), the cleanest demonstration of what a depth sensor buys",
+         "the SAME desk sweep as OWN_tum_desk with the real Kinect depth integrated: 0.032 m ATE against "
+         "0.081 m RGB-only, the cleanest demonstration of what a depth sensor buys",
          "real", dataset="TUM RGB-D (freiburg1_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
     Case("RGBD_tum_desk2", "track B: RGB + sensor depth (Kinect)",
          SequenceSpec("RGBD_tum_desk2",
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg2_desk"),
                       n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
                       intrinsics=_TUM2, max_render_depth=6.0),
-         "the SAME wider desk loop as OWN_tum_desk2 with the Kinect depth integrated: Track B on a bigger "
-         "workspace with more depth range",
+         "the SAME wider desk loop as OWN_tum_desk2 with the Kinect depth integrated: 0.014 m ATE against "
+         "0.118 m RGB-only, Track B on a bigger workspace with more depth range",
          "real", dataset="TUM RGB-D (freiburg2_desk, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
     Case("RGBD_tum_xyz", "track B: RGB + sensor depth (Kinect)",
          SequenceSpec("RGBD_tum_xyz",
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg1_xyz"),
                       n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
                       intrinsics=_TUM1, max_render_depth=5.0),
-         "the SAME xyz-calibration sweep as OWN_tum_xyz with the Kinect depth integrated: tight motion, the "
-         "cleanest geometry test",
+         "the SAME xyz-calibration sweep as OWN_tum_xyz with the Kinect depth integrated: 0.024 m ATE, a hair "
+         "under the RGB-only 0.025 m, because tight motion is the one regime where monocular scale holds up",
          "real", dataset="TUM RGB-D (freiburg1_xyz, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
     Case("RGBD_tum_pioneer", "track B: RGB + sensor depth (Kinect)",
          SequenceSpec("RGBD_tum_pioneer",
                       source_dir=str(DATA_ROOT / "train" / "tum-rgbd" / "rgbd_dataset_freiburg2_pioneer_slam"),
                       n_frames=0, max_frames=240, decimation=2, engine="rgbd-sensor",
                       intrinsics=_TUM2, max_render_depth=6.0),
-         "the SAME robot SLAM run as OWN_tum_pioneer with the Kinect depth integrated: Track B on the hardest "
-         "drift test (0.024 m validated vs 0.031 m RGB-only)",
+         "the SAME robot SLAM run as OWN_tum_pioneer with the Kinect depth integrated: 0.040 m ATE against "
+         "0.134 m RGB-only, Track B on the hardest drift test",
          "real", dataset="TUM RGB-D (freiburg2_pioneer_slam, Sturm et al. 2012)", license="CC BY 4.0 (TUM RGB-D)"),
     # ---- classical depth-only method on the SAME RGB-D scenarios: point-to-plane ICP on the sensor depth (no RGB
     # in the pose estimation; RGB colors the display only). The same registration the LiDAR-only scenario runs,
