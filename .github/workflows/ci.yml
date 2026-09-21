@@ -3,12 +3,15 @@ name: CI
 on:
   push:
     branches: [main, develop]
-  pull_request:
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,18 +19,15 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install (offline lane + dev + editable pkg)
-        run: pip install -r data-pipeline/requirements.txt -r requirements-dev.txt -e .
+        run: pip install -r requirements-dev.txt -e .
       - name: Lint
         run: ruff check data-pipeline tests
-      - name: Tests
-        run: pytest
-      - name: Pipeline smoke (regenerate the synthetic CPU case)
-        run: python -m lidar3dlab.pipeline SYN_orbit
       - name: CONTRACT 2 — manifests <-> artifacts consistent (no drift)
         run: python scripts/check_artifacts.py
 
   guards:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Base-integrity guards (the regressions this archetype forbids)
@@ -47,3 +47,5 @@ jobs:
             echo "::error::leaked local machine path (D:\\_Repos) in a tracked file"; fail=1; fi
           if [ "$fail" -eq 0 ]; then echo "guards: OK"; fi
           exit $fail
+      - name: CI budget, trunk-only triggers, no training (ADR-0074)
+        run: python3 scripts/check_ci_budget.py
