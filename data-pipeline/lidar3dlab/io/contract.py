@@ -1,4 +1,4 @@
-"""CONTRACT 1 — ingestion (raw -> pipeline). The *bring-your-own-data* gate.
+"""CONTRACT 1, ingestion (raw -> pipeline). The *bring-your-own-data* gate.
 
 Declares what a valid reconstruction input is: an ordered folder of RGB frames + the inference knobs, with
 an EXPLICIT policy. A sequence is ACCEPTED iff it passes; bad inputs are REJECTED with a reason (never

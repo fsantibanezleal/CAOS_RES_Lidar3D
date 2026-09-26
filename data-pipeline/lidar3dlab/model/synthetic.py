@@ -1,4 +1,4 @@
-"""Synthetic CPU reconstruction engine (no GPU, no model) — a procedural corridor flythrough.
+"""Synthetic CPU reconstruction engine (no GPU, no model), a procedural corridor flythrough.
 
 Used by the `synthetic` cases: it exercises the SAME per-frame-depth -> unproject -> fuse path as the real
 lingbot engine (so the pipeline, contracts, gate, export and the web replay are identical), but runs in

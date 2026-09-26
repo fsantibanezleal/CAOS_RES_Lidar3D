@@ -1,5 +1,5 @@
-"""Stage 6 — export (CONTRACT 2): write the compact trace artifact + the case manifest. Records the measured
-lane/gate verdict (always 'precompute' here — the engine is not browser-runnable), the artifact byte size,
+"""Stage 6, export (CONTRACT 2): write the compact trace artifact + the case manifest. Records the measured
+lane/gate verdict (always 'precompute' here, the engine is not browser-runnable), the artifact byte size,
 the CONTRACT-1 flags, the refine info and the evaluation metrics."""
 from __future__ import annotations
 

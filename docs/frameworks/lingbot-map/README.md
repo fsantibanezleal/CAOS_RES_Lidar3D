@@ -1,4 +1,4 @@
-# Framework — lingbot-map (the reconstruction engine)
+# Framework: lingbot-map (the reconstruction engine)
 
 The binding SOTA engine for this product (ADR-0057: the deep research is binding, not decoration). It is
 vendored under [`third_party/lingbot-map/`](../../../third_party/lingbot-map/) (Apache-2.0) and actually
@@ -24,7 +24,7 @@ paged KV cache. Full analysis: [`docs/research/lingbot-map-deep-dive.md`](../../
 pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
 pip install -e third_party/lingbot-map --no-deps          # Apache-2.0, vendored
 ```
-FlashInfer is **not** built here (no CUDA toolkit) — the engine uses its SDPA fallback (`use_sdpa=True`).
+FlashInfer is **not** built here (no CUDA toolkit), the engine uses its SDPA fallback (`use_sdpa=True`).
 
 ## Configure (8 GB-safe, validated on an RTX 4070 Laptop)
 

@@ -1,6 +1,6 @@
-"""Stage 5 — refine (the texture / surface layer). The raw cloud is already RGB-colored from the frames;
+"""Stage 5, refine (the texture / surface layer). The raw cloud is already RGB-colored from the frames;
 refine cleans it (voxel downsample + statistical outlier removal + normals) and, when Open3D is available,
-this is the hook for a textured Poisson mesh — the answer to "it should not look like a bare LiDAR map".
+this is the hook for a textured Poisson mesh, the answer to "it should not look like a bare LiDAR map".
 Degrades gracefully on CPU (no nvcc / no gsplat required); 3DGS is an optional future lane that needs nvcc."""
 from __future__ import annotations
 

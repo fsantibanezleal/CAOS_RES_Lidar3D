@@ -39,11 +39,11 @@ Key flags:
 Training uses **best-checkpoint early stopping** (the held-out `long_office` ATE is evaluated each epoch; the
 checkpoint is saved only when it improves). Outputs under `LIDAR3D_MODELS_ROOT/own-depthpose/`:
 
-- `own-depthpose.pt` — the canonical file the engine loads.
-- `own-depthpose-<variant>-<runid>.pt` — a **unique per-run archive** (never clobbered, so no model is ever lost).
-- `own-depthpose.meta.json` — a tiny sidecar (backbone, pose_head, ATE, data) that the pipeline reads for an
+- `own-depthpose.pt`: the canonical file the engine loads.
+- `own-depthpose-<variant>-<runid>.pt`: a **unique per-run archive** (never clobbered, so no model is ever lost).
+- `own-depthpose.meta.json`: a tiny sidecar (backbone, pose_head, ATE, data) that the pipeline reads for an
   accurate engine label.
-- `experiments.jsonl` — one appended line per epoch (the full training history, fed to the web Model-history tab).
+- `experiments.jsonl`: one appended line per epoch (the full training history, fed to the web Model-history tab).
 
 ## 2. Bake a scene (offline precompute)
 

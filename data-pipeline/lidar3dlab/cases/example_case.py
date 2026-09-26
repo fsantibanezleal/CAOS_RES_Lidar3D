@@ -4,7 +4,7 @@ expected band (what a domain expert should see), real|synthetic flag. Includes a
 pipeline must handle without a GPU (CI-safe).
 
 The 4 real sequences are the ones shipped with lingbot-map (preserved on the E: scratch volume, resolved via
-LIDAR3D_DATA_ROOT — never an absolute path here). They bake offline on the GPU; the synthetic case bakes on
+LIDAR3D_DATA_ROOT, never an absolute path here). They bake offline on the GPU; the synthetic case bakes on
 CPU and is what CI smoke-tests.
 """
 from __future__ import annotations

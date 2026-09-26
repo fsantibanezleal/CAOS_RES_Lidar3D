@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="What the app is — placeholder, specialise per product">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="What the app is, placeholder, specialise per product">
   <!-- PLACEHOLDER (template). Each product REPLACES this with a diagram of its own
        domain: the real problem, the inputs, the science core, the value it returns.
        Keep the shell CSS-variable tokens so it stays themed. -->
@@ -23,7 +23,7 @@
   </defs>
 
   <text class="ttl" x="22" y="30">What the app is</text>
-  <text class="ph" x="22" y="47">PLACEHOLDER — replace with this product's domain problem → input → method → value</text>
+  <text class="ph" x="22" y="47">PLACEHOLDER, replace with this product's domain problem → input → method → value</text>
 
   <rect class="bx bx-hi" x="20" y="74" width="194" height="150" rx="11"/>
   <text class="it" x="34" y="100">The problem</text>
@@ -41,7 +41,7 @@
 
   <rect class="bx bx-hi" x="476" y="74" width="194" height="150" rx="11"/>
   <text class="it" x="490" y="100">The method</text>
-  <text class="mu" x="490" y="120">SOTA, real — a</text>
+  <text class="mu" x="490" y="120">SOTA, real, a</text>
   <text class="mu" x="490" y="136">classical baseline</text>
   <text class="mu" x="490" y="156">+ a learned model</text>
   <text class="cd mono" x="490" y="182">src/&lt;domain&gt;/ · *.onnx</text>
@@ -59,7 +59,7 @@
 
   <rect class="bx" x="20" y="256" width="860" height="180" rx="11"/>
   <text class="it" x="36" y="282">It is a real system, not a demo:</text>
-  <text class="mu" x="36" y="306">• a deterministic engine that recomputes live in the browser on every control — no mocked outputs;</text>
+  <text class="mu" x="36" y="306">• a deterministic engine that recomputes live in the browser on every control, no mocked outputs;</text>
   <text class="mu" x="36" y="328">• an offline pipeline with two validated data contracts, so you can run it on YOUR data, not just the built-in cases;</text>
   <text class="mu" x="36" y="350">• a learned model trained from real / sourced data and exported to ONNX, running client-side next to a classical baseline;</text>
   <text class="mu" x="36" y="372">• six documented pages (App · Introduction · Methodology · Implementation · Experiments · Benchmark);</text>

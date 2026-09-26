@@ -115,9 +115,9 @@ head (and, in the pretrained variant, its steadier pose) matters as much as dept
 `train/train_depthpose.py` trains on real TUM RGB-D (registered metric depth + ground-truth trajectory) and,
 optionally with `--use_icl`, on ICL-NUIM (synthetic, *perfect* ground-truth depth). Key flags:
 
-- `--backbone {scratch,resnet18}` — pick the encoder.
-- `--use_icl` — add ICL-NUIM perfect-depth pairs (cleaner depth supervision).
-- `--base`, `--size`, `--lr`, `--epochs`, `--batch` — capacity and optimisation.
+- `--backbone {scratch,resnet18}`: pick the encoder.
+- `--use_icl`: add ICL-NUIM perfect-depth pairs (cleaner depth supervision).
+- `--base`, `--size`, `--lr`, `--epochs`, `--batch`: capacity and optimisation.
 
 Training uses **best-checkpoint early stopping**: the held-out ATE is evaluated each epoch and the checkpoint is
 saved only when ATE improves (a long run can overfit and *degrade* ATE, the "diffuse" look). Every epoch's result is
@@ -140,8 +140,8 @@ Working resolution 224×224. The `resnet18` variant (the deployed one):
 | | d2: up⊕x2 | /4 | base |
 | | d1: up⊕x1 | /2 | base |
 | | head (conv1×1) → interpolate to input | 224 | 2 (depth_raw, logvar) |
-| Pose head — `siamese` (default) | global-pool x5 of both frames → MLP(1024→256→128→6) | — | 6 (se(3)) |
-| Pose head — `corr` (experimental) | local correlation of x4 (9×9 window) ⊕ x4 → convnet → MLP → 6 | — | 6 (se(3)) |
+| Pose head, `siamese` (default) | global-pool x5 of both frames → MLP(1024→256→128→6) | – | 6 (se(3)) |
+| Pose head, `corr` (experimental) | local correlation of x4 (9×9 window) ⊕ x4 → convnet → MLP → 6 | – | 6 (se(3)) |
 
 - `base = 32` (decoder width). Total ~12.8 M params (ResNet-18 ~11.7 M + our decoder/pose ~1.1 M).
 - Depth output: `D_max·σ(head[0])`, `D_max = 10 m`. Log-variance clamped to [−8, 8].
