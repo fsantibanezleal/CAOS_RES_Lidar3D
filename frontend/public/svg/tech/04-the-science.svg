@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="The science / algorithm flow — placeholder, specialise per product">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" class="arch-svg" role="img" aria-label="The science / algorithm flow, placeholder, specialise per product">
   <!-- PLACEHOLDER (template). Each product REPLACES this with its real algorithm,
        step by step, with the genuine equations. Keep the shell tokens (themed). -->
   <style>
@@ -23,7 +23,7 @@
   </defs>
 
   <text class="ttl" x="22" y="30">The science / algorithm flow</text>
-  <text class="ph" x="22" y="47">PLACEHOLDER — replace with this product's real stages + equations (e.g. image → watershed → PSD → Rosin–Rammler)</text>
+  <text class="ph" x="22" y="47">PLACEHOLDER, replace with this product's real stages + equations (e.g. image → watershed → PSD → Rosin–Rammler)</text>
 
   <!-- staged pipeline -->
   <rect class="bx bx-hi" x="20" y="78" width="180" height="92" rx="10"/>
@@ -59,7 +59,7 @@
   <!-- baseline vs learned -->
   <rect class="bx" x="20" y="312" width="404" height="128" rx="10"/>
   <text class="it" x="36" y="336" style="font-weight:700">Classical baseline</text>
-  <text class="mu" x="36" y="358">a transparent, deterministic method —</text>
+  <text class="mu" x="36" y="358">a transparent, deterministic method, </text>
   <text class="mu" x="36" y="378">the honest reference every result is</text>
   <text class="mu" x="36" y="398">measured against.</text>
   <text class="cd mono" x="36" y="424">src/&lt;domain&gt;/*.ts (runs live)</text>

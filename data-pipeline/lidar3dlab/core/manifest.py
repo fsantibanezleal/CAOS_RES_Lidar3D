@@ -1,4 +1,4 @@
-"""CONTRACT 2 — artifact (pipeline -> web). The manifest is the authoritative, versioned record of a baked
+"""CONTRACT 2, artifact (pipeline -> web). The manifest is the authoritative, versioned record of a baked
 case: its source label (NEVER an absolute path), inference knobs, seed, engine+version, the artifact pointer
 + byte size, the lane/gate verdict, CONTRACT-1 flags, the refine info and the evaluation metrics. The web
 loads ONLY manifests + artifacts; frontend/src/lib/contract.types.ts mirrors this schema so a drift fails

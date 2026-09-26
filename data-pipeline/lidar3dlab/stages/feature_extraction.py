@@ -1,4 +1,4 @@
-"""Stage 2 — feature_extraction: cheap per-frame quality signals (mean luma, sharpness) on sampled frames.
+"""Stage 2, feature_extraction: cheap per-frame quality signals (mean luma, sharpness) on sampled frames.
 Low luma / low sharpness mark frames whose geometry is unreliable. Light; skipped for synthetic cases."""
 from __future__ import annotations
 

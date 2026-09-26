@@ -1,4 +1,4 @@
-# CAOS_RES_Lidar3D — streaming 3D reconstruction lab
+# CAOS_RES_Lidar3D: streaming 3D reconstruction lab
 
 [![CI](https://img.shields.io/github/actions/workflow/status/fsantibanezleal/CAOS_RES_Lidar3D/ci.yml?branch=main&label=CI)](https://github.com/fsantibanezleal/CAOS_RES_Lidar3D/actions)
 [![License](https://img.shields.io/github/license/fsantibanezleal/CAOS_RES_Lidar3D)](LICENSE)
@@ -57,7 +57,7 @@ page. The lab therefore separates:
 ```bash
 # 1. Environment (Python 3.12 .venv + the precompute deps; torch + the vendored engine per docs/frameworks/lingbot-map)
 scripts/setup.ps1                                   # or: bash scripts/setup.sh
-# 2. Bake the synthetic CPU case (no GPU/model needed) — proves the pipeline end-to-end
+# 2. Bake the synthetic CPU case (no GPU/model needed): proves the pipeline end-to-end
 .venv/Scripts/python.exe -m lidar3dlab.pipeline SYN_orbit
 # 3. Bake a real sequence (needs the GPU + the env paths from the vault)
 LIDAR3D_MODELS_ROOT=… LIDAR3D_DATA_ROOT=… .venv/Scripts/python.exe -m lidar3dlab.pipeline oxford

@@ -1,4 +1,4 @@
-# Framework card — `<tool>` (TEMPLATE)
+# Framework card: `<tool>` (TEMPLATE)
 
 Copy to `docs/frameworks/<NN>_<tool>/<tool>.md` for **every** research-chosen engine/library. The deep research is
 **binding**: each engine used by the pipeline gets a card here AND an exact pin in the matching requirements file
@@ -22,5 +22,5 @@ Which stage uses it (`infer`/`train`/…), its inputs/outputs, and which contrac
 Numerical caveats, performance, and redistribution terms.
 
 ---
-*The template's EXAMPLE engine is numpy-only SIR, so it ships no SOTA card — a real product fills one per engine
+*The template's EXAMPLE engine is numpy-only SIR, so it ships no SOTA card, a real product fills one per engine
 (e.g. `01_yade/`, `02_ortools/`, `03_mintpy/`, `04_torch/`).*

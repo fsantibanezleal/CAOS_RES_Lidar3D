@@ -1,6 +1,6 @@
 // Prebuild: copy the committed CONTRACT-2 artifacts (../data/derived) into the SPA's public/ so the static site
 // replays them, and inline the lidar3dlab sources for the live (Pyodide) lane. Canonical copies live in ../data
-// and ../data-pipeline — public/ is a build-time overlay (git-ignored).
+// and ../data-pipeline, public/ is a build-time overlay (git-ignored).
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +16,7 @@ if (existsSync(derived)) {
   cpSync(derived, join(PUB, 'data'), { recursive: true });
   console.log('[copy-data] data/derived -> public/data');
 } else {
-  console.warn('[copy-data] no data/derived — run scripts/precompute first');
+  console.warn('[copy-data] no data/derived, run scripts/precompute first');
 }
 
 // 2) inline the lidar3dlab Python sources for the optional Pyodide live lane -> public/pyodide/sources.json

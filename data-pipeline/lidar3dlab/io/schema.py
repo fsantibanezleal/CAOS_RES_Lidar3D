@@ -1,4 +1,4 @@
-"""Typed objects passed between pipeline stages — the inter-stage contract. Plain dataclasses.
+"""Typed objects passed between pipeline stages, the inter-stage contract. Plain dataclasses.
 
 Domain: streaming 3D reconstruction. A `SequenceSpec` is one validated operating point (a frame sequence
 + the 8 GB-safe inference knobs); a `ReconResult` is the engine's raw output for that sequence (per-frame
@@ -41,7 +41,7 @@ class FrameFeature:
 
 @dataclass(frozen=True)
 class ReconResult:
-    """The engine output for one sequence (infer stage) — raw, undecimated. Offline/precompute lane, so the
+    """The engine output for one sequence (infer stage), raw, undecimated. Offline/precompute lane, so the
     arrays are NumPy (efficient for millions of points); the export stage decimates + base64-encodes them."""
     case_id: str
     n_frames: int

@@ -1,4 +1,4 @@
-"""LiDAR odometry engine — the second modality that makes "Lidar 3D" honest (the camera engines reconstruct
+"""LiDAR odometry engine, the second modality that makes "Lidar 3D" honest (the camera engines reconstruct
 LiDAR-LIKE clouds from video; this one consumes actual LiDAR scans).
 
 Frame-to-frame registration with Open3D point-to-plane ICP (a real, standard point-cloud registration

@@ -22,7 +22,7 @@ jobs:
         run: pip install -r requirements-dev.txt -e .
       - name: Lint
         run: ruff check data-pipeline tests
-      - name: CONTRACT 2 — manifests <-> artifacts consistent (no drift)
+      - name: CONTRACT 2, manifests <-> artifacts consistent (no drift)
         run: python scripts/check_artifacts.py
 
   guards:
@@ -39,9 +39,9 @@ jobs:
           # venvs / native binaries / heavy model blobs must never be tracked
           if git ls-files | grep -qiE '(^|/)\.?venv|\.(dll|so|dylib|pt|pth)$'; then
             echo "::error::a venv or native/heavy binary is tracked (recreate from requirements; keep models small/LFS)"; fail=1; fi
-          # raw/heavy data must never be tracked — commit only compact derived artifacts under data/derived/
+          # raw/heavy data must never be tracked, commit only compact derived artifacts under data/derived/
           if git ls-files | grep -qiE '\.(parquet|h5|hdf5|nc|mat|npy)$'; then
-            echo "::error::raw/heavy data tracked — commit only compact derived artifacts (data/derived/)"; fail=1; fi
+            echo "::error::raw/heavy data tracked, commit only compact derived artifacts (data/derived/)"; fail=1; fi
           # no leaked local machine paths in tracked sources
           if git grep -nF 'D:\_Repos' -- . ':!.github' >/dev/null 2>&1; then
             echo "::error::leaked local machine path (D:\\_Repos) in a tracked file"; fail=1; fi
@@ -49,3 +49,5 @@ jobs:
           exit $fail
       - name: CI budget, trunk-only triggers, no training (ADR-0074)
         run: python3 scripts/check_ci_budget.py
+      - name: No em-dash and no emoji in tracked content (ADR-0067)
+        run: python3 scripts/check_content_standards.py

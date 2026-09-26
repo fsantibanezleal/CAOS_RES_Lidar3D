@@ -1,4 +1,4 @@
-"""Stage 3 — train: intentionally a documented NO-OP for this product. The reconstruction engine is the
+"""Stage 3, train: intentionally a documented NO-OP for this product. The reconstruction engine is the
 PRETRAINED lingbot-map foundation model (Apache-2.0), used as-is; there is no per-product surrogate to fit.
 The stage name is kept (frozen base) and records that fact in the manifest. A future ONNX distillation of a
 sub-model (e.g. a low-VRAM single-image preview) would live here."""
