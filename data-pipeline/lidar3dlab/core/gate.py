@@ -25,7 +25,7 @@ def classify_lane(*, pure_python: bool, wheels: set[str], run_ms: float, trace_b
     if trace_bytes > TRACE_BYTES_GATE:
         live = False
         reasons.append(f"trace_bytes {trace_bytes} > {TRACE_BYTES_GATE}")
-    # NOTE: the raw measured run_ms is used for the DECISION but deliberately NOT stored — the committed manifest
+    # NOTE: the raw measured run_ms is used for the DECISION but deliberately NOT stored: the committed manifest
     # must be a pure function of (params, seed); wall-clock would dirty git on every re-run. We record the verdict
     # + the (deterministic) budgets instead. The live runtime is measured separately, live, in the browser.
     return {

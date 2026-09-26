@@ -3,6 +3,12 @@
 All notable changes to this product. Format: `X.XX.XXX` (display); see `lidar3dlab.__version__`. Keep `0.x`
 while on mock/synthetic data. Tag every release.
 
+## [0.16.001] - 2026-09-26
+
+### Changed
+
+- No em-dash in the product's content (ADR-0067); the archetype's content guard runs in CI.
+
 ## [0.16.000] - 2026-09-03
 
 ### Added
@@ -441,7 +447,7 @@ while on mock/synthetic data. Tag every release.
 
 ## [0.03.000] · 2026-06-30
 
-### Added (the LiDAR modality — makes "Lidar 3D" honest, a second real engine)
+### Added (the LiDAR modality: makes "Lidar 3D" honest, a second real engine)
 - `model/lidar.py`: a **LiDAR odometry engine** (Open3D point-to-plane ICP) that registers LiDAR scans
   frame-to-frame and accumulates a height-colored map + trajectory. KISS-ICP (SOTA LiDAR-only odometry) is
   pinned and swappable behind the same interface. Synthetic scans (CI-safe) + a real-scan path
@@ -474,14 +480,14 @@ while on mock/synthetic data. Tag every release.
 - `SYN_orbit` bakes on CPU (deterministic); `oxford` = 193k-pt RGB cloud, 3.13 m, lane=precompute, ~7.1 GB peak.
 - ruff clean, pytest green, frontend builds (tsc + vite), 5 cases manifest-to-artifact consistent.
 
-## [0.01.000] — 2026-06-20
+## [0.01.000]: 2026-06-20
 
 ### Added
 - Initial instantiation from the CAOS product-repo template (ADR-0057).
 - Offline `data-pipeline/` (`lidar3dlab`): the two data contracts (ingestion + artifact), the named staged
   pipeline (preprocess → feature_extraction → train → infer → evaluate → export), the seeded RNG, the compact
   trace, the manifest, and the measured live-vs-precompute gate.
-- EXAMPLE engine: a deterministic SIR epidemic (numpy-only, Pyodide-safe) — **replace with the product's
+- EXAMPLE engine: a deterministic SIR epidemic (numpy-only, Pyodide-safe): **replace with the product's
   research-chosen SOTA engine**.
 - Cases-by-category registry (4 regimes + 1 degenerate control); a live-lane entrypoint (`live.py`); tests for
   both contracts + pipeline determinism.

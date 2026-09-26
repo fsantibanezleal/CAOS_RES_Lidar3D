@@ -1,4 +1,4 @@
-"""The case registry — cases grouped by CATEGORY. The App shows ONE selected case; Experiments/Benchmark show
+"""The case registry, cases grouped by CATEGORY. The App shows ONE selected case; Experiments/Benchmark show
 cross-case summaries by category."""
 from __future__ import annotations
 

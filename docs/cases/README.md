@@ -27,14 +27,14 @@ model-agnostic engine handles the rest.
 
 - **Modalities**: camera (synthetic, lingbot SOTA, and our model) + LiDAR (synthetic + real KITTI).
 - **Engines**: control (synthetic), classical (Open3D ICP), SOTA reference (lingbot-map), and OURS (trained
-  depth+pose) — all behind one `reconstruct(spec) -> ReconResult` contract, so they are directly comparable.
+  depth+pose), all behind one `reconstruct(spec) -> ReconResult` contract, so they are directly comparable.
 - **Honesty axis**: 4 of the own scenes are **truly held-out** (freiburg3 office, 7-Scenes heads/stairs), so they
   test generalization, not memorization; the rest are in the training distribution and labelled as such.
 - **Difficulty axis**: from tight calibration motion (xyz) through desk sweeps to a long fast robot hall
-  (pioneer) — the drift stress-test.
+  (pioneer), the drift stress-test.
 - **Datasets + licenses**: every case surfaces its dataset + license in the App (see
   [models/04_datasets.md](../models/04_datasets.md)).
 
 Each own scene is baked at 240 frames with real intrinsics + the ICP-refined pose ladder (see
 [models/01_own-depth-pose.md](../models/01_own-depth-pose.md)). Add a scenario by pointing the engine at a new RGB
-folder — see [guides/08](../guides/08_train-and-run-the-own-model.md).
+folder, see [guides/08](../guides/08_train-and-run-the-own-model.md).

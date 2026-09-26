@@ -1,4 +1,4 @@
-"""Stage 1 — preprocess: resolve + sanity-check the sequence's frames (CONTRACT 1 already validated the
+"""Stage 1, preprocess: resolve + sanity-check the sequence's frames (CONTRACT 1 already validated the
 schema). Returns the ordered frame paths the engine consumes. No-op for synthetic procedural cases."""
 from __future__ import annotations
 

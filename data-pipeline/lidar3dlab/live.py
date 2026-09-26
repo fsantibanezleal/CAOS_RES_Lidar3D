@@ -1,4 +1,4 @@
-"""LIVE lane — NOT browser-feasible for this product (dormant per ADR-0057).
+"""LIVE lane, NOT browser-feasible for this product (dormant per ADR-0057).
 
 lingbot-map is a ~1B-parameter ViT needing a CUDA GPU + a 4.6 GB checkpoint, so there is NO Pyodide/WASM
 browser-live engine here (unlike the lighter SimLab/PINN-Lab labs; even the synthetic engine pulls
