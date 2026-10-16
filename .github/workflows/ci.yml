@@ -34,7 +34,8 @@ jobs:
         run: |
           fail=0
           # a real .env must never be tracked (only .env.example)
-          if git ls-files | grep -qE '(^|/)\.env(\..+)?$' && ! git ls-files | grep -qx '.env.example'; then
+          envs="$(git ls-files | grep -E '(^|/)\.env(\..+)?$' | grep -vE '(^|/)\.env(\..+)?\.example$' || true)"
+          if [ -n "$envs" ]; then
             echo "::error::a real .env is tracked (only .env.example may be)"; fail=1; fi
           # venvs / native binaries / heavy model blobs must never be tracked
           if git ls-files | grep -qiE '(^|/)\.?venv|\.(dll|so|dylib|pt|pth)$'; then
